@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/product.dart';
 import '../data/product_repository.dart';
 import '../data/permissions.dart';
+import 'responsive.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({
@@ -34,19 +35,22 @@ class _ProductsScreenState extends State<ProductsScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search products',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: const Color(0xFFF2F3F7),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
+            padding: Responsive.pagePadding(context).copyWith(bottom: 8),
+            child: Responsive.centered(
+              context,
+              TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search products',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: const Color(0xFFF2F3F7),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
+                onChanged: (value) => setState(() => _query = value.trim()),
               ),
-              onChanged: (value) => setState(() => _query = value.trim()),
             ),
           ),
           Expanded(
@@ -66,81 +70,85 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   return const Center(child: Text('No products yet'));
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final product = filtered[index];
-                    return Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: InkWell(
-                        onTap: perms.edit ? () => _openForm(product) : null,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: const Color(0xFFE7EAF6),
-                                  child: Text(
-                                    product.name.isEmpty
-                                        ? '?'
-                                        : product.name[0].toUpperCase(),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        product.name,
-                                        style: theme.textTheme.titleMedium,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        product.sku,
-                                        style: theme.textTheme.bodySmall?.copyWith(
-                                          color: Colors.black54,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (product.dirty)
-                                  const Icon(Icons.sync, size: 18),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Category: ${product.category}',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                            Text(
-                              'Stock: ${product.stock} ${product.unit}',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                            Text(
-                              'Price: ${product.price.toStringAsFixed(2)}',
-                              style: theme.textTheme.bodySmall,
+                return Responsive.centered(
+                  context,
+                  ListView.separated(
+                    padding: Responsive.pagePadding(context),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final product = filtered[index];
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                      ),
-                    );
-                  },
+                        child: InkWell(
+                          onTap: perms.edit ? () => _openForm(product) : null,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: const Color(0xFFE7EAF6),
+                                    child: Text(
+                                      product.name.isEmpty
+                                          ? '?'
+                                          : product.name[0].toUpperCase(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          product.name,
+                                          style: theme.textTheme.titleMedium,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          product.sku,
+                                          style:
+                                              theme.textTheme.bodySmall?.copyWith(
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (product.dirty)
+                                    const Icon(Icons.sync, size: 18),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Category: ${product.category}',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              Text(
+                                'Stock: ${product.stock} ${product.unit}',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              Text(
+                                'Price: ${product.price.toStringAsFixed(2)}',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 );
               },
             ),
@@ -183,52 +191,67 @@ class _ProductsScreenState extends State<ProductsScreen> {
         final viewInsets = MediaQuery.of(context).viewInsets;
         return Padding(
           padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + viewInsets.bottom),
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              Text(
-                isEditing ? 'Edit Product' : 'New Product',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              _Field(label: 'Name', controller: nameController),
-              _Field(label: 'SKU', controller: skuController),
-              _Field(label: 'Category', controller: categoryController),
-              _Field(label: 'Unit', controller: unitController),
-              _Field(
-                label: 'Price',
-                controller: priceController,
-                keyboardType: TextInputType.number,
-              ),
-              _Field(
-                label: 'Cost',
-                controller: costController,
-                keyboardType: TextInputType.number,
-              ),
-              _Field(
-                label: 'Stock',
-                controller: stockController,
-                keyboardType: TextInputType.number,
-              ),
-              _Field(
-                label: 'Notes',
-                controller: notesController,
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  if (name.isEmpty) return;
-                  final price =
-                      double.tryParse(priceController.text.trim()) ?? 0;
-                  final cost = double.tryParse(costController.text.trim()) ?? 0;
-                  final stock =
-                      double.tryParse(stockController.text.trim()) ?? 0;
+          child: Responsive.centered(
+            context,
+            ListView(
+              shrinkWrap: true,
+              children: [
+                Text(
+                  isEditing ? 'Edit Product' : 'New Product',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
+                _Field(label: 'Name', controller: nameController),
+                _Field(label: 'SKU', controller: skuController),
+                _Field(label: 'Category', controller: categoryController),
+                _Field(label: 'Unit', controller: unitController),
+                _Field(
+                  label: 'Price',
+                  controller: priceController,
+                  keyboardType: TextInputType.number,
+                ),
+                _Field(
+                  label: 'Cost',
+                  controller: costController,
+                  keyboardType: TextInputType.number,
+                ),
+                _Field(
+                  label: 'Stock',
+                  controller: stockController,
+                  keyboardType: TextInputType.number,
+                ),
+                _Field(
+                  label: 'Notes',
+                  controller: notesController,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    if (name.isEmpty) return;
+                    final price =
+                        double.tryParse(priceController.text.trim()) ?? 0;
+                    final cost =
+                        double.tryParse(costController.text.trim()) ?? 0;
+                    final stock =
+                        double.tryParse(stockController.text.trim()) ?? 0;
 
-                  if (isEditing) {
-                    await widget.repository.updateProduct(
-                      product!.copyWith(
+                    if (isEditing) {
+                      await widget.repository.updateProduct(
+                        product!.copyWith(
+                          name: name,
+                          sku: skuController.text.trim(),
+                          category: categoryController.text.trim(),
+                          unit: unitController.text.trim(),
+                          price: price,
+                          cost: cost,
+                          stock: stock,
+                          notes: notesController.text.trim(),
+                        ),
+                      );
+                    } else {
+                      await widget.repository.addProduct(
                         name: name,
                         sku: skuController.text.trim(),
                         category: categoryController.text.trim(),
@@ -237,25 +260,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         cost: cost,
                         stock: stock,
                         notes: notesController.text.trim(),
-                      ),
-                    );
-                  } else {
-                    await widget.repository.addProduct(
-                      name: name,
-                      sku: skuController.text.trim(),
-                      category: categoryController.text.trim(),
-                      unit: unitController.text.trim(),
-                      price: price,
-                      cost: cost,
-                      stock: stock,
-                      notes: notesController.text.trim(),
-                    );
-                  }
-                  if (mounted) Navigator.of(context).pop();
-                },
-                child: Text(isEditing ? 'Save' : 'Create'),
-              ),
-            ],
+                      );
+                    }
+                    if (mounted) Navigator.of(context).pop();
+                  },
+                  child: Text(isEditing ? 'Save' : 'Create'),
+                ),
+              ],
+            ),
           ),
         );
       },

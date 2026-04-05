@@ -6,6 +6,7 @@ import '../data/product_repository.dart';
 import '../data/purchase_repository.dart';
 import '../data/user_repository.dart';
 import '../data/vendor_repository.dart';
+import 'responsive.dart';
 import 'approvals_screen.dart';
 import 'inventory_screen.dart';
 import 'purchases_screen.dart';
@@ -103,59 +104,62 @@ class MoreScreen extends StatelessWidget {
         title: const Text('More'),
         centerTitle: false,
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: modules.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final module = modules[index];
-          return InkWell(
-            onTap: () => _openModule(context, module.builder),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: const Color(0xFFE7EAF6),
-                    child: Icon(module.icon, color: const Color(0xFF2A3A6A)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          module.title,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          module.subtitle,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: Colors.black54),
-                        ),
-                      ],
+      body: Responsive.centered(
+        context,
+        ListView.separated(
+          padding: Responsive.pagePadding(context),
+          itemCount: modules.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final module = modules[index];
+            return InkWell(
+              onTap: () => _openModule(context, module.builder),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
-                  ),
-                  const Icon(Icons.chevron_right),
-                ],
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: const Color(0xFFE7EAF6),
+                      child: Icon(module.icon, color: const Color(0xFF2A3A6A)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            module.title,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            module.subtitle,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: Colors.black54),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

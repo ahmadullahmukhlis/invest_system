@@ -181,55 +181,58 @@ class _CustomersScreenState extends State<CustomersScreen> {
         final viewInsets = MediaQuery.of(context).viewInsets;
         return Padding(
           padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + viewInsets.bottom),
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              Text(
-                isEditing ? 'Edit Customer' : 'New Customer',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              _Field(label: 'Name', controller: nameController),
-              _Field(label: 'Phone', controller: phoneController),
-              _Field(label: 'Email', controller: emailController),
-              _Field(label: 'Address', controller: addressController),
-              _Field(label: 'Company', controller: companyController),
-              _Field(
-                label: 'Notes',
-                controller: notesController,
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  if (name.isEmpty) return;
-                  if (isEditing) {
-                    await widget.repository.updateCustomer(
-                      customer!.copyWith(
+          child: Responsive.centered(
+            context,
+            ListView(
+              shrinkWrap: true,
+              children: [
+                Text(
+                  isEditing ? 'Edit Customer' : 'New Customer',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
+                _Field(label: 'Name', controller: nameController),
+                _Field(label: 'Phone', controller: phoneController),
+                _Field(label: 'Email', controller: emailController),
+                _Field(label: 'Address', controller: addressController),
+                _Field(label: 'Company', controller: companyController),
+                _Field(
+                  label: 'Notes',
+                  controller: notesController,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    if (name.isEmpty) return;
+                    if (isEditing) {
+                      await widget.repository.updateCustomer(
+                        customer!.copyWith(
+                          name: name,
+                          phone: phoneController.text.trim(),
+                          email: emailController.text.trim(),
+                          address: addressController.text.trim(),
+                          company: companyController.text.trim(),
+                          notes: notesController.text.trim(),
+                        ),
+                      );
+                    } else {
+                      await widget.repository.addCustomer(
                         name: name,
                         phone: phoneController.text.trim(),
                         email: emailController.text.trim(),
                         address: addressController.text.trim(),
                         company: companyController.text.trim(),
                         notes: notesController.text.trim(),
-                      ),
-                    );
-                  } else {
-                    await widget.repository.addCustomer(
-                      name: name,
-                      phone: phoneController.text.trim(),
-                      email: emailController.text.trim(),
-                      address: addressController.text.trim(),
-                      company: companyController.text.trim(),
-                      notes: notesController.text.trim(),
-                    );
-                  }
-                  if (mounted) Navigator.of(context).pop();
-                },
-                child: Text(isEditing ? 'Save' : 'Create'),
-              ),
-            ],
+                      );
+                    }
+                    if (mounted) Navigator.of(context).pop();
+                  },
+                  child: Text(isEditing ? 'Save' : 'Create'),
+                ),
+              ],
+            ),
           ),
         );
       },

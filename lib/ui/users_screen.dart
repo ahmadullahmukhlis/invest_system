@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/permissions.dart';
 import '../data/user_profile.dart';
 import '../data/user_repository.dart';
+import 'responsive.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key, required this.userRepository});
@@ -44,13 +45,15 @@ class _UsersScreenState extends State<UsersScreen> {
             return const Center(child: Text('No users yet'));
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: users.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final user = users[index];
-              return Container(
+          return Responsive.centered(
+            context,
+            ListView.separated(
+              padding: Responsive.pagePadding(context),
+              itemCount: users.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final user = users[index];
+                return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -138,8 +141,9 @@ class _UsersScreenState extends State<UsersScreen> {
                     ),
                   ],
                 ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ),
@@ -167,76 +171,79 @@ class _UsersScreenState extends State<UsersScreen> {
           builder: (context, setModalState) {
             return Padding(
               padding: const EdgeInsets.all(16),
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  Text(
-                    'Permissions: ${user.name.isEmpty ? user.email : user.name}',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 12),
-                  for (final module in modules) ...[
+              child: Responsive.centered(
+                context,
+                ListView(
+                  shrinkWrap: true,
+                  children: [
                     Text(
-                      module.toUpperCase(),
-                      style: Theme.of(context).textTheme.labelLarge,
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        _permChip(
-                          label: 'View',
-                          value: permissions[module]!.view,
-                          onChanged: (value) {
-                            setModalState(() {
-                              permissions[module] =
-                                  permissions[module]!.copyWith(view: value);
-                            });
-                          },
-                        ),
-                        _permChip(
-                          label: 'Create',
-                          value: permissions[module]!.create,
-                          onChanged: (value) {
-                            setModalState(() {
-                              permissions[module] =
-                                  permissions[module]!.copyWith(create: value);
-                            });
-                          },
-                        ),
-                        _permChip(
-                          label: 'Edit',
-                          value: permissions[module]!.edit,
-                          onChanged: (value) {
-                            setModalState(() {
-                              permissions[module] =
-                                  permissions[module]!.copyWith(edit: value);
-                            });
-                          },
-                        ),
-                        _permChip(
-                          label: 'Delete',
-                          value: permissions[module]!.remove,
-                          onChanged: (value) {
-                            setModalState(() {
-                              permissions[module] =
-                                  permissions[module]!.copyWith(remove: value);
-                            });
-                          },
-                        ),
-                      ],
+                      'Permissions: ${user.name.isEmpty ? user.email : user.name}',
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 12),
+                    for (final module in modules) ...[
+                      Text(
+                        module.toUpperCase(),
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          _permChip(
+                            label: 'View',
+                            value: permissions[module]!.view,
+                            onChanged: (value) {
+                              setModalState(() {
+                                permissions[module] =
+                                    permissions[module]!.copyWith(view: value);
+                              });
+                            },
+                          ),
+                          _permChip(
+                            label: 'Create',
+                            value: permissions[module]!.create,
+                            onChanged: (value) {
+                              setModalState(() {
+                                permissions[module] =
+                                    permissions[module]!.copyWith(create: value);
+                              });
+                            },
+                          ),
+                          _permChip(
+                            label: 'Edit',
+                            value: permissions[module]!.edit,
+                            onChanged: (value) {
+                              setModalState(() {
+                                permissions[module] =
+                                    permissions[module]!.copyWith(edit: value);
+                              });
+                            },
+                          ),
+                          _permChip(
+                            label: 'Delete',
+                            value: permissions[module]!.remove,
+                            onChanged: (value) {
+                              setModalState(() {
+                                permissions[module] =
+                                    permissions[module]!.copyWith(remove: value);
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    FilledButton(
+                      onPressed: () async {
+                        await widget.userRepository
+                            .updateUserPermissions(user.uid, permissions);
+                        if (mounted) Navigator.of(context).pop();
+                      },
+                      child: const Text('Save Permissions'),
+                    ),
                   ],
-                  FilledButton(
-                    onPressed: () async {
-                      await widget.userRepository
-                          .updateUserPermissions(user.uid, permissions);
-                      if (mounted) Navigator.of(context).pop();
-                    },
-                    child: const Text('Save Permissions'),
-                  ),
-                ],
+                ),
               ),
             );
           },

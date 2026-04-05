@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../data/user_repository.dart';
 import 'users_screen.dart';
+import 'responsive.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key, required this.userRepository});
@@ -21,9 +22,11 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Settings'),
             centerTitle: false,
           ),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
+          body: Responsive.centered(
+            context,
+            ListView(
+              padding: Responsive.pagePadding(context),
+              children: [
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -109,7 +112,8 @@ class SettingsScreen extends StatelessWidget {
                 },
                 child: const Text('Sign Out'),
               ),
-            ],
+              ],
+            ),
           ),
         );
       },

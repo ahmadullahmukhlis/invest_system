@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/vendor.dart';
 import '../data/vendor_repository.dart';
 import '../data/permissions.dart';
+import 'responsive.dart';
 
 class VendorsScreen extends StatefulWidget {
   const VendorsScreen({
@@ -34,19 +35,22 @@ class _VendorsScreenState extends State<VendorsScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search vendors',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: const Color(0xFFF2F3F7),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
+            padding: Responsive.pagePadding(context).copyWith(bottom: 8),
+            child: Responsive.centered(
+              context,
+              TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search vendors',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: const Color(0xFFF2F3F7),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
+                onChanged: (value) => setState(() => _query = value.trim()),
               ),
-              onChanged: (value) => setState(() => _query = value.trim()),
             ),
           ),
           Expanded(
@@ -67,77 +71,81 @@ class _VendorsScreenState extends State<VendorsScreen> {
                   return const Center(child: Text('No vendors yet'));
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final vendor = filtered[index];
-                    return Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: InkWell(
-                        onTap: perms.edit ? () => _openForm(vendor) : null,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: const Color(0xFFE7EAF6),
-                                  child: Text(
-                                    vendor.name.isEmpty
-                                        ? '?'
-                                        : vendor.name[0].toUpperCase(),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        vendor.name,
-                                        style: theme.textTheme.titleMedium,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        vendor.company,
-                                        style: theme.textTheme.bodySmall?.copyWith(
-                                          color: Colors.black54,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (vendor.dirty)
-                                  const Icon(Icons.sync, size: 18),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              vendor.phone,
-                              style: theme.textTheme.bodySmall,
-                            ),
-                            Text(
-                              vendor.email,
-                              style: theme.textTheme.bodySmall,
+                return Responsive.centered(
+                  context,
+                  ListView.separated(
+                    padding: Responsive.pagePadding(context),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final vendor = filtered[index];
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                      ),
-                    );
-                  },
+                        child: InkWell(
+                          onTap: perms.edit ? () => _openForm(vendor) : null,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: const Color(0xFFE7EAF6),
+                                    child: Text(
+                                      vendor.name.isEmpty
+                                          ? '?'
+                                          : vendor.name[0].toUpperCase(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          vendor.name,
+                                          style: theme.textTheme.titleMedium,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          vendor.company,
+                                          style:
+                                              theme.textTheme.bodySmall?.copyWith(
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (vendor.dirty)
+                                    const Icon(Icons.sync, size: 18),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                vendor.phone,
+                                style: theme.textTheme.bodySmall,
+                              ),
+                              Text(
+                                vendor.email,
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 );
               },
             ),
@@ -173,55 +181,58 @@ class _VendorsScreenState extends State<VendorsScreen> {
         final viewInsets = MediaQuery.of(context).viewInsets;
         return Padding(
           padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + viewInsets.bottom),
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              Text(
-                isEditing ? 'Edit Vendor' : 'New Vendor',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              _Field(label: 'Name', controller: nameController),
-              _Field(label: 'Phone', controller: phoneController),
-              _Field(label: 'Email', controller: emailController),
-              _Field(label: 'Address', controller: addressController),
-              _Field(label: 'Company', controller: companyController),
-              _Field(
-                label: 'Notes',
-                controller: notesController,
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () async {
-                  final name = nameController.text.trim();
-                  if (name.isEmpty) return;
-                  if (isEditing) {
-                    await widget.repository.updateVendor(
-                      vendor!.copyWith(
+          child: Responsive.centered(
+            context,
+            ListView(
+              shrinkWrap: true,
+              children: [
+                Text(
+                  isEditing ? 'Edit Vendor' : 'New Vendor',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
+                _Field(label: 'Name', controller: nameController),
+                _Field(label: 'Phone', controller: phoneController),
+                _Field(label: 'Email', controller: emailController),
+                _Field(label: 'Address', controller: addressController),
+                _Field(label: 'Company', controller: companyController),
+                _Field(
+                  label: 'Notes',
+                  controller: notesController,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () async {
+                    final name = nameController.text.trim();
+                    if (name.isEmpty) return;
+                    if (isEditing) {
+                      await widget.repository.updateVendor(
+                        vendor!.copyWith(
+                          name: name,
+                          phone: phoneController.text.trim(),
+                          email: emailController.text.trim(),
+                          address: addressController.text.trim(),
+                          company: companyController.text.trim(),
+                          notes: notesController.text.trim(),
+                        ),
+                      );
+                    } else {
+                      await widget.repository.addVendor(
                         name: name,
                         phone: phoneController.text.trim(),
                         email: emailController.text.trim(),
                         address: addressController.text.trim(),
                         company: companyController.text.trim(),
                         notes: notesController.text.trim(),
-                      ),
-                    );
-                  } else {
-                    await widget.repository.addVendor(
-                      name: name,
-                      phone: phoneController.text.trim(),
-                      email: emailController.text.trim(),
-                      address: addressController.text.trim(),
-                      company: companyController.text.trim(),
-                      notes: notesController.text.trim(),
-                    );
-                  }
-                  if (mounted) Navigator.of(context).pop();
-                },
-                child: Text(isEditing ? 'Save' : 'Create'),
-              ),
-            ],
+                      );
+                    }
+                    if (mounted) Navigator.of(context).pop();
+                  },
+                  child: Text(isEditing ? 'Save' : 'Create'),
+                ),
+              ],
+            ),
           ),
         );
       },

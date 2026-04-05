@@ -6,6 +6,7 @@ import '../data/product.dart';
 import '../data/product_repository.dart';
 import '../data/purchase.dart';
 import '../data/purchase_repository.dart';
+import 'responsive.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({
@@ -26,30 +27,33 @@ class ReportsScreen extends StatelessWidget {
         title: const Text('Reports'),
         centerTitle: false,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _ReportCard<Customer>(
-            title: 'Customers',
-            subtitle: 'Total customers in system',
-            stream: customerRepository.stream,
-            icon: Icons.people_alt,
-          ),
-          const SizedBox(height: 12),
-          _ReportCard<Product>(
-            title: 'Products',
-            subtitle: 'Total products listed',
-            stream: productRepository.stream,
-            icon: Icons.inventory_2,
-          ),
-          const SizedBox(height: 12),
-          _ReportCard<Purchase>(
-            title: 'Purchases',
-            subtitle: 'Orders tracked',
-            stream: purchaseRepository.stream,
-            icon: Icons.receipt_long,
-          ),
-        ],
+      body: Responsive.centered(
+        context,
+        ListView(
+          padding: Responsive.pagePadding(context),
+          children: [
+            _ReportCard<Customer>(
+              title: 'Customers',
+              subtitle: 'Total customers in system',
+              stream: customerRepository.stream,
+              icon: Icons.people_alt,
+            ),
+            const SizedBox(height: 12),
+            _ReportCard<Product>(
+              title: 'Products',
+              subtitle: 'Total products listed',
+              stream: productRepository.stream,
+              icon: Icons.inventory_2,
+            ),
+            const SizedBox(height: 12),
+            _ReportCard<Purchase>(
+              title: 'Purchases',
+              subtitle: 'Orders tracked',
+              stream: purchaseRepository.stream,
+              icon: Icons.receipt_long,
+            ),
+          ],
+        ),
       ),
     );
   }

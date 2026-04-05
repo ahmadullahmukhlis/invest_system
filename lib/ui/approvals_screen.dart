@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'responsive.dart';
 
 class ApprovalsScreen extends StatelessWidget {
   const ApprovalsScreen({super.key});
@@ -28,11 +29,14 @@ class ApprovalsScreen extends StatelessWidget {
         title: const Text('Approvals'),
         centerTitle: false,
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: approvals.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) => approvals[index],
+      body: Responsive.centered(
+        context,
+        ListView.separated(
+          padding: Responsive.pagePadding(context),
+          itemCount: approvals.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) => approvals[index],
+        ),
       ),
     );
   }
