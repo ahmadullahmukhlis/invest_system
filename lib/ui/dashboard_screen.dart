@@ -2,16 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../data/customer_repository.dart';
 import '../data/product_repository.dart';
+import '../data/purchase_repository.dart';
+import '../data/vendor_repository.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({
     super.key,
     required this.customerRepository,
     required this.productRepository,
+    required this.vendorRepository,
+    required this.purchaseRepository,
   });
 
   final CustomerRepository customerRepository;
   final ProductRepository productRepository;
+  final VendorRepository vendorRepository;
+  final PurchaseRepository purchaseRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +55,9 @@ class DashboardScreen extends StatelessWidget {
                   stream: customerRepository.stream,
                   builder: (context, snapshot) {
                     final online = customerRepository.isOnline &&
-                        productRepository.isOnline;
+                        productRepository.isOnline &&
+                        vendorRepository.isOnline &&
+                        purchaseRepository.isOnline;
                     return Text(online ? 'Online' : 'Offline');
                   },
                 ),
@@ -70,6 +78,26 @@ class DashboardScreen extends StatelessWidget {
                       title: 'Products',
                       stream: productRepository.stream,
                       icon: Icons.inventory,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MetricCard(
+                      title: 'Vendors',
+                      stream: vendorRepository.stream,
+                      icon: Icons.storefront,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _MetricCard(
+                      title: 'Purchases',
+                      stream: purchaseRepository.stream,
+                      icon: Icons.receipt_long,
                     ),
                   ),
                 ],

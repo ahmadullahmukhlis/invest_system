@@ -1,5 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+
+import '../data/firebase_config.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -11,6 +14,7 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
   bool _isRegister = false;
   bool _loading = false;
   String? _error;
@@ -19,6 +23,7 @@ class _AuthScreenState extends State<AuthScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -66,6 +71,11 @@ class _AuthScreenState extends State<AuthScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
+                    if (_isRegister)
+                      _Field(
+                        label: 'Full name',
+                        controller: _nameController,
+                      ),
                     _Field(
                       label: 'Email',
                       controller: _emailController,
@@ -124,8 +134,13 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _submit() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
+    final name = _nameController.text.trim();
     if (email.isEmpty || password.isEmpty) {
       setState(() => _error = 'Email and password are required.');
+      return;
+    }
+    if (_isRegister && name.isEmpty) {
+      setState(() => _error = 'Full name is required.');
       return;
     }
 
@@ -136,14 +151,27 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isRegister) {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        final credential = await FirebaseAuth.instance
+            .createUserWithEmailAndPassword(
           email: email,
           password: password,
         );
+        await credential.user?.updateDisplayName(name);
+        await _ensureProfile(
+          user: credential.user,
+          name: name,
+          email: email,
+        );
       } else {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
+        final credential = await FirebaseAuth.instance
+            .signInWithEmailAndPassword(
           email: email,
           password: password,
+        );
+        await _ensureProfile(
+          user: credential.user,
+          name: credential.user?.displayName ?? '',
+          email: email,
         );
       }
     } on FirebaseAuthException catch (e) {
@@ -155,6 +183,29 @@ class _AuthScreenState extends State<AuthScreen> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _ensureProfile({
+    required User? user,
+    required String name,
+    required String email,
+  }) async {
+    if (user == null) return;
+    final db = databaseInstance();
+    final usersRef = db.ref('users');
+    final userRef = usersRef.child(user.uid);
+    final snapshot = await userRef.get();
+    if (snapshot.exists) return;
+
+    final usersSnapshot = await usersRef.get();
+    final isFirstUser = !usersSnapshot.exists;
+    final role = isFirstUser ? 'admin' : 'staff';
+    await userRef.set({
+      'name': name,
+      'email': email,
+      'role': role,
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    });
   }
 }
 

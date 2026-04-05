@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../data/customer_repository.dart';
 import '../data/product_repository.dart';
+import '../data/purchase_repository.dart';
+import '../data/user_repository.dart';
+import '../data/vendor_repository.dart';
 import 'customers_screen.dart';
 import 'dashboard_screen.dart';
 import 'more_screen.dart';
@@ -12,10 +15,16 @@ class AppShell extends StatefulWidget {
     super.key,
     required this.customerRepository,
     required this.productRepository,
+    required this.vendorRepository,
+    required this.purchaseRepository,
+    required this.userRepository,
   });
 
   final CustomerRepository customerRepository;
   final ProductRepository productRepository;
+  final VendorRepository vendorRepository;
+  final PurchaseRepository purchaseRepository;
+  final UserRepository userRepository;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -30,10 +39,18 @@ class _AppShellState extends State<AppShell> {
       DashboardScreen(
         customerRepository: widget.customerRepository,
         productRepository: widget.productRepository,
+        vendorRepository: widget.vendorRepository,
+        purchaseRepository: widget.purchaseRepository,
       ),
       CustomersScreen(repository: widget.customerRepository),
       ProductsScreen(repository: widget.productRepository),
-      const MoreScreen(),
+      MoreScreen(
+        vendorRepository: widget.vendorRepository,
+        purchaseRepository: widget.purchaseRepository,
+        productRepository: widget.productRepository,
+        customerRepository: widget.customerRepository,
+        userRepository: widget.userRepository,
+      ),
     ];
 
     return Scaffold(

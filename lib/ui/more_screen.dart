@@ -1,40 +1,75 @@
 import 'package:flutter/material.dart';
 
+import '../data/customer_repository.dart';
+import '../data/product_repository.dart';
+import '../data/purchase_repository.dart';
+import '../data/user_repository.dart';
+import '../data/vendor_repository.dart';
+import 'approvals_screen.dart';
+import 'inventory_screen.dart';
+import 'purchases_screen.dart';
+import 'reports_screen.dart';
+import 'settings_screen.dart';
+import 'vendors_screen.dart';
+
 class MoreScreen extends StatelessWidget {
-  const MoreScreen({super.key});
+  const MoreScreen({
+    super.key,
+    required this.vendorRepository,
+    required this.purchaseRepository,
+    required this.productRepository,
+    required this.customerRepository,
+    required this.userRepository,
+  });
+
+  final VendorRepository vendorRepository;
+  final PurchaseRepository purchaseRepository;
+  final ProductRepository productRepository;
+  final CustomerRepository customerRepository;
+  final UserRepository userRepository;
 
   @override
   Widget build(BuildContext context) {
-    final modules = const [
+    final modules = [
       _ModuleTile(
         title: 'Vendors',
         subtitle: 'Suppliers and contacts',
         icon: Icons.storefront,
+        builder: (_) => VendorsScreen(repository: vendorRepository),
       ),
       _ModuleTile(
         title: 'Purchases',
         subtitle: 'Orders, invoices, approvals',
         icon: Icons.receipt_long,
+        builder: (_) => PurchasesScreen(repository: purchaseRepository),
       ),
       _ModuleTile(
         title: 'Inventory',
         subtitle: 'Stock movements and audits',
         icon: Icons.warehouse,
+        builder: (_) => InventoryScreen(repository: productRepository),
       ),
       _ModuleTile(
         title: 'Approvals',
         subtitle: 'Workflow and permissions',
         icon: Icons.verified_user,
+        builder: (_) => const ApprovalsScreen(),
       ),
       _ModuleTile(
         title: 'Reports',
         subtitle: 'Spending, vendors, stock',
         icon: Icons.insights,
+        builder: (_) => ReportsScreen(
+          customerRepository: customerRepository,
+          productRepository: productRepository,
+          purchaseRepository: purchaseRepository,
+        ),
       ),
       _ModuleTile(
         title: 'Settings',
         subtitle: 'Teams and preferences',
         icon: Icons.settings,
+        builder: (_) => SettingsScreen(userRepository: userRepository),
       ),
     ];
 
@@ -50,7 +85,7 @@ class MoreScreen extends StatelessWidget {
         itemBuilder: (context, index) {
           final module = modules[index];
           return InkWell(
-            onTap: () => _openModule(context, module.title),
+            onTap: () => _openModule(context, module.builder),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -100,11 +135,12 @@ class MoreScreen extends StatelessWidget {
     );
   }
 
-  void _openModule(BuildContext context, String title) {
+  void _openModule(
+    BuildContext context,
+    WidgetBuilder builder,
+  ) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _ModulePlaceholder(title: title),
-      ),
+      MaterialPageRoute(builder: builder),
     );
   }
 }
@@ -114,28 +150,11 @@ class _ModuleTile {
     required this.title,
     required this.subtitle,
     required this.icon,
+    required this.builder,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
-}
-
-class _ModulePlaceholder extends StatelessWidget {
-  const _ModulePlaceholder({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(
-          '$title module is ready for the next step.',
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-      ),
-    );
-  }
+  final WidgetBuilder builder;
 }
