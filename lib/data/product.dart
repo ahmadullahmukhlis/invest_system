@@ -1,6 +1,7 @@
 class Product {
   Product({
     required this.id,
+    required this.ownerUid,
     required this.name,
     required this.sku,
     required this.category,
@@ -14,6 +15,7 @@ class Product {
   });
 
   final String id;
+  final String ownerUid;
   final String name;
   final String sku;
   final String category;
@@ -27,6 +29,7 @@ class Product {
 
   Product copyWith({
     String? id,
+    String? ownerUid,
     String? name,
     String? sku,
     String? category,
@@ -40,6 +43,7 @@ class Product {
   }) {
     return Product(
       id: id ?? this.id,
+      ownerUid: ownerUid ?? this.ownerUid,
       name: name ?? this.name,
       sku: sku ?? this.sku,
       category: category ?? this.category,
@@ -56,6 +60,7 @@ class Product {
   Map<String, Object?> toMap() {
     return {
       'id': id,
+      'owner_uid': ownerUid,
       'name': name,
       'sku': sku,
       'category': category,
@@ -78,6 +83,7 @@ class Product {
 
     return Product(
       id: map['id'] as String,
+      ownerUid: (map['owner_uid'] as String?) ?? '',
       name: (map['name'] as String?) ?? '',
       sku: (map['sku'] as String?) ?? '',
       category: (map['category'] as String?) ?? '',
@@ -105,7 +111,11 @@ class Product {
     };
   }
 
-  static Product fromJson(String id, Map<dynamic, dynamic> json) {
+  static Product fromJson(
+    String id,
+    String ownerUid,
+    Map<dynamic, dynamic> json,
+  ) {
     double asDouble(Object? value) {
       if (value is int) return value.toDouble();
       if (value is double) return value;
@@ -114,6 +124,7 @@ class Product {
 
     return Product(
       id: id,
+      ownerUid: ownerUid,
       name: (json['name'] as String?) ?? '',
       sku: (json['sku'] as String?) ?? '',
       category: (json['category'] as String?) ?? '',

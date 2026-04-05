@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../data/vendor.dart';
 import '../data/vendor_repository.dart';
+import '../data/permissions.dart';
 
 class VendorsScreen extends StatefulWidget {
-  const VendorsScreen({super.key, required this.repository});
+  const VendorsScreen({
+    super.key,
+    required this.repository,
+    required this.permissions,
+  });
 
   final VendorRepository repository;
+  final PermissionSet? permissions;
 
   @override
   State<VendorsScreen> createState() => _VendorsScreenState();
@@ -18,6 +24,8 @@ class _VendorsScreenState extends State<VendorsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final perms = widget.permissions ??
+        PermissionSet(view: false, create: false, edit: false, remove: false);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vendors'),
@@ -79,7 +87,7 @@ class _VendorsScreenState extends State<VendorsScreen> {
                         ],
                       ),
                       child: InkWell(
-                        onTap: () => _openForm(vendor),
+                        onTap: perms.edit ? () => _openForm(vendor) : null,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -137,7 +145,7 @@ class _VendorsScreenState extends State<VendorsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _openForm(null),
+        onPressed: perms.create ? () => _openForm(null) : null,
         child: const Icon(Icons.add),
       ),
     );

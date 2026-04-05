@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../data/product.dart';
 import '../data/product_repository.dart';
+import '../data/permissions.dart';
 
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({super.key, required this.repository});
+  const ProductsScreen({
+    super.key,
+    required this.repository,
+    required this.permissions,
+  });
 
   final ProductRepository repository;
+  final PermissionSet? permissions;
 
   @override
   State<ProductsScreen> createState() => _ProductsScreenState();
@@ -18,6 +24,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final perms = widget.permissions ??
+        PermissionSet(view: false, create: false, edit: false, remove: false);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Products'),
@@ -78,7 +86,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         ],
                       ),
                       child: InkWell(
-                        onTap: () => _openForm(product),
+                        onTap: perms.edit ? () => _openForm(product) : null,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -140,7 +148,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _openForm(null),
+        onPressed: perms.create ? () => _openForm(null) : null,
         child: const Icon(Icons.add),
       ),
     );

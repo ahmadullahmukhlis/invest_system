@@ -3,6 +3,9 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
 import '../data/firebase_config.dart';
+import '../data/permissions.dart';
+import '../data/user_repository.dart';
+import 'responsive.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -40,10 +43,11 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Container(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Responsive.centered(
+              context,
+              Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -191,22 +195,35 @@ class _AuthScreenState extends State<AuthScreen> {
     required String email,
   }) async {
     if (user == null) return;
-    final db = databaseInstance();
-    final usersRef = db.ref('users');
-    final userRef = usersRef.child(user.uid);
-    final snapshot = await userRef.get();
-    if (snapshot.exists) return;
+        final db = databaseInstance();
+        final usersRef = db.ref('users');
+        final userRef = usersRef.child(user.uid);
+        final snapshot = await userRef.get();
+        if (snapshot.exists) {
+          if (email.toLowerCase() == UserRepository.superAdminEmail) {
+            final permissions = defaultPermissionsForRole('super_admin');
+            await userRef.update({
+              'role': 'super_admin',
+              'permissions': permissions.map((k, v) => MapEntry(k, v.toJson())),
+              'updatedAt': DateTime.now().millisecondsSinceEpoch,
+            });
+          }
+          return;
+        }
 
-    final usersSnapshot = await usersRef.get();
-    final isFirstUser = !usersSnapshot.exists;
-    final role = isFirstUser ? 'admin' : 'staff';
-    await userRef.set({
-      'name': name,
-      'email': email,
-      'role': role,
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
-    });
-  }
+        final superAdminEmail = UserRepository.superAdminEmail;
+        final role = email.toLowerCase() == superAdminEmail
+            ? 'super_admin'
+            : 'viewer';
+        final permissions = defaultPermissionsForRole(role);
+        await userRef.set({
+          'name': name,
+          'email': email,
+          'role': role,
+          'permissions': permissions.map((k, v) => MapEntry(k, v.toJson())),
+          'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        });
+      }
 }
 
 class _Field extends StatelessWidget {

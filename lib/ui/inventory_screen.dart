@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../data/product.dart';
 import '../data/product_repository.dart';
+import '../data/permissions.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key, required this.repository});
+  const InventoryScreen({
+    super.key,
+    required this.repository,
+    required this.permissions,
+  });
 
   final ProductRepository repository;
+  final PermissionSet? permissions;
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -17,6 +23,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final perms = widget.permissions ??
+        PermissionSet(view: false, create: false, edit: false, remove: false);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Inventory'),
@@ -99,7 +107,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           ),
                           IconButton(
                             icon: const Icon(Icons.tune),
-                            onPressed: () => _adjustStock(product),
+                            onPressed:
+                                perms.edit ? () => _adjustStock(product) : null,
                           ),
                         ],
                       ),

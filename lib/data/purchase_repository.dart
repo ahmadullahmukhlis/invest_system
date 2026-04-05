@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import 'local_db.dart';
 import 'purchase.dart';
+import 'user_repository.dart';
 
 class PurchaseRepository {
   PurchaseRepository({
@@ -14,15 +15,18 @@ class PurchaseRepository {
     FirebaseAuth? auth,
     FirebaseDatabase? database,
     Connectivity? connectivity,
+    required UserRepository userRepository,
   })  : _localDb = localDb ?? LocalDb.instance,
         _auth = auth ?? FirebaseAuth.instance,
         _database = database ?? FirebaseDatabase.instance,
-        _connectivity = connectivity ?? Connectivity();
+        _connectivity = connectivity ?? Connectivity(),
+        _userRepository = userRepository;
 
   final LocalDb _localDb;
   final FirebaseAuth _auth;
   final FirebaseDatabase _database;
   final Connectivity _connectivity;
+  final UserRepository _userRepository;
   final _uuid = const Uuid();
 
   final _controller = StreamController<List<Purchase>>.broadcast();
@@ -34,6 +38,7 @@ class PurchaseRepository {
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   StreamSubscription<DatabaseEvent>? _remoteSub;
+  StreamSubscription? _profileSub;
 
   Future<void> init() async {
     await _localDb.init();
@@ -45,11 +50,18 @@ class PurchaseRepository {
     _connectivitySub = _connectivity.onConnectivityChanged.listen(
       (result) => _handleConnectivity(result),
     );
+    _profileSub = _userRepository.currentUserStream.listen((_) async {
+      await _stopRemoteSync();
+      await _loadLocal();
+      final current = await _connectivity.checkConnectivity();
+      await _handleConnectivity(current);
+    });
   }
 
   Future<void> dispose() async {
     await _connectivitySub?.cancel();
     await _remoteSub?.cancel();
+    await _profileSub?.cancel();
     await _controller.close();
   }
 
@@ -64,6 +76,7 @@ class PurchaseRepository {
     final now = DateTime.now().millisecondsSinceEpoch;
     final purchase = Purchase(
       id: _uuid.v4(),
+      ownerUid: _currentUid,
       vendorName: vendorName,
       reference: reference,
       total: total,
@@ -110,9 +123,16 @@ class PurchaseRepository {
     _controller.add(_purchases);
   }
 
+  String get _currentUid => _auth.currentUser?.uid ?? '';
+
+  bool get _isGlobal =>
+      _userRepository.currentRole == 'admin' ||
+      _userRepository.currentRole == 'super_admin';
+
   DatabaseReference _ref() {
-    final uid = _auth.currentUser!.uid;
-    return _database.ref('purchases/$uid');
+    return _isGlobal
+        ? _database.ref('purchases')
+        : _database.ref('purchases/$_currentUid');
   }
 
   Future<void> _startRemoteSync() async {
@@ -131,16 +151,45 @@ class PurchaseRepository {
     if (value is! Map) return;
     var changed = false;
 
-    for (final entry in value.entries) {
-      final key = entry.key;
-      final data = entry.value;
-      if (key is! String || data is! Map) continue;
+    if (_isGlobal) {
+      for (final userEntry in value.entries) {
+        final ownerUid = userEntry.key;
+        final userData = userEntry.value;
+        if (ownerUid is! String || userData is! Map) continue;
+        for (final entry in userData.entries) {
+          final key = entry.key;
+          final data = entry.value;
+          if (key is! String || data is! Map) continue;
+          final remote = Purchase.fromJson(
+            key,
+            ownerUid,
+            data.cast<dynamic, dynamic>(),
+          );
+          final local =
+              await _localDb.getPurchaseById(remote.id, ownerUid: ownerUid);
+          if (local == null || remote.updatedAt > local.updatedAt) {
+            await _localDb.upsertPurchase(remote.copyWith(dirty: false));
+            changed = true;
+          }
+        }
+      }
+    } else {
+      for (final entry in value.entries) {
+        final key = entry.key;
+        final data = entry.value;
+        if (key is! String || data is! Map) continue;
 
-      final remote = Purchase.fromJson(key, data.cast<dynamic, dynamic>());
-      final local = await _localDb.getPurchaseById(remote.id);
-      if (local == null || remote.updatedAt > local.updatedAt) {
-        await _localDb.upsertPurchase(remote.copyWith(dirty: false));
-        changed = true;
+        final remote = Purchase.fromJson(
+          key,
+          _currentUid,
+          data.cast<dynamic, dynamic>(),
+        );
+        final local =
+            await _localDb.getPurchaseById(remote.id, ownerUid: _currentUid);
+        if (local == null || remote.updatedAt > local.updatedAt) {
+          await _localDb.upsertPurchase(remote.copyWith(dirty: false));
+          changed = true;
+        }
       }
     }
 
@@ -150,20 +199,32 @@ class PurchaseRepository {
   }
 
   Future<void> _pushDirtyPurchases() async {
-    final dirtyPurchases = await _localDb.getDirtyPurchases();
+    final dirtyPurchases = await _localDb.getDirtyPurchases(
+      ownerUid: _currentUid,
+      all: _isGlobal,
+    );
     for (final purchase in dirtyPurchases) {
       await _pushPurchase(purchase);
     }
   }
 
   Future<void> _pushPurchase(Purchase purchase) async {
-    await _ref().child(purchase.id).set(purchase.toJson());
+    final ownerUid = purchase.ownerUid.isEmpty ? _currentUid : purchase.ownerUid;
+    await _database.ref('purchases/$ownerUid').child(purchase.id).set(
+          purchase.toJson(),
+        );
     await _localDb.markPurchaseClean(purchase.id);
     await _loadLocal();
   }
 
   Future<void> _loadLocal() async {
-    _purchases = await _localDb.getAllPurchases();
+    if (!_isGlobal && _currentUid.isNotEmpty) {
+      await _localDb.claimUnownedPurchases(_currentUid);
+    }
+    _purchases = await _localDb.getAllPurchases(
+      ownerUid: _currentUid,
+      all: _isGlobal,
+    );
     _controller.add(_purchases);
   }
 }

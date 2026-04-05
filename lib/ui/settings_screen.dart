@@ -72,7 +72,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              if (profile?.role == 'admin')
+              if (profile?.role == 'admin' || profile?.role == 'super_admin')
                 _SettingsTile(
                   title: 'User Management',
                   subtitle: 'Invite, edit roles, permissions',
@@ -83,7 +83,8 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-              if (profile?.role == 'admin') const SizedBox(height: 12),
+              if (profile?.role == 'admin' || profile?.role == 'super_admin')
+                const SizedBox(height: 12),
               _SettingsTile(
                 title: 'Team Roles',
                 subtitle: 'Admin, manager, staff',

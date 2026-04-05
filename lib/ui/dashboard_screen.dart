@@ -4,6 +4,7 @@ import '../data/customer_repository.dart';
 import '../data/product_repository.dart';
 import '../data/purchase_repository.dart';
 import '../data/vendor_repository.dart';
+import 'responsive.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({
@@ -32,9 +33,11 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
+          child: Responsive.centered(
+            context,
+            ListView(
+              padding: Responsive.pagePadding(context),
+              children: [
               Text(
                 'Office Purchase System',
                 style: theme.textTheme.headlineSmall,
@@ -63,45 +66,9 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'Customers',
-                      stream: customerRepository.stream,
-                      icon: Icons.people_alt,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'Products',
-                      stream: productRepository.stream,
-                      icon: Icons.inventory,
-                    ),
-                  ),
-                ],
-              ),
+              _metricGrid(context),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'Vendors',
-                      stream: vendorRepository.stream,
-                      icon: Icons.storefront,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'Purchases',
-                      stream: purchaseRepository.stream,
-                      icon: Icons.receipt_long,
-                    ),
-                  ),
-                ],
-              ),
+              if (!Responsive.isTablet(context)) _metricGrid(context, secondary: true),
               const SizedBox(height: 20),
               Text(
                 'Quick Actions',
@@ -118,10 +85,71 @@ class DashboardScreen extends StatelessWidget {
                   _QuickAction(label: 'Reports', icon: Icons.insights),
                 ],
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _metricGrid(BuildContext context, {bool secondary = false}) {
+    final cards = secondary
+        ? [
+            _MetricCard(
+              title: 'Vendors',
+              stream: vendorRepository.stream,
+              icon: Icons.storefront,
+            ),
+            _MetricCard(
+              title: 'Purchases',
+              stream: purchaseRepository.stream,
+              icon: Icons.receipt_long,
+            ),
+          ]
+        : [
+            _MetricCard(
+              title: 'Customers',
+              stream: customerRepository.stream,
+              icon: Icons.people_alt,
+            ),
+            _MetricCard(
+              title: 'Products',
+              stream: productRepository.stream,
+              icon: Icons.inventory,
+            ),
+            if (Responsive.isTablet(context))
+              _MetricCard(
+                title: 'Vendors',
+                stream: vendorRepository.stream,
+                icon: Icons.storefront,
+              ),
+            if (Responsive.isTablet(context))
+              _MetricCard(
+                title: 'Purchases',
+                stream: purchaseRepository.stream,
+                icon: Icons.receipt_long,
+              ),
+          ];
+
+    if (!Responsive.isTablet(context)) {
+      return Row(
+        children: [
+          Expanded(child: cards[0]),
+          const SizedBox(width: 16),
+          Expanded(child: cards[1]),
+        ],
+      );
+    }
+
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      childAspectRatio: 1.4,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      children: cards,
     );
   }
 }

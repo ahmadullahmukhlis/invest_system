@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import 'customer.dart';
 import 'local_db.dart';
+import 'user_repository.dart';
 
 class CustomerRepository {
   CustomerRepository({
@@ -14,15 +15,18 @@ class CustomerRepository {
     FirebaseAuth? auth,
     FirebaseDatabase? database,
     Connectivity? connectivity,
+    required UserRepository userRepository,
   })  : _localDb = localDb ?? LocalDb.instance,
         _auth = auth ?? FirebaseAuth.instance,
         _database = database ?? FirebaseDatabase.instance,
-        _connectivity = connectivity ?? Connectivity();
+        _connectivity = connectivity ?? Connectivity(),
+        _userRepository = userRepository;
 
   final LocalDb _localDb;
   final FirebaseAuth _auth;
   final FirebaseDatabase _database;
   final Connectivity _connectivity;
+  final UserRepository _userRepository;
   final _uuid = const Uuid();
 
   final _controller = StreamController<List<Customer>>.broadcast();
@@ -34,6 +38,7 @@ class CustomerRepository {
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   StreamSubscription<DatabaseEvent>? _remoteSub;
+  StreamSubscription? _profileSub;
 
   Future<void> init() async {
     await _localDb.init();
@@ -45,11 +50,18 @@ class CustomerRepository {
     _connectivitySub = _connectivity.onConnectivityChanged.listen(
       (result) => _handleConnectivity(result),
     );
+    _profileSub = _userRepository.currentUserStream.listen((_) async {
+      await _stopRemoteSync();
+      await _loadLocal();
+      final current = await _connectivity.checkConnectivity();
+      await _handleConnectivity(current);
+    });
   }
 
   Future<void> dispose() async {
     await _connectivitySub?.cancel();
     await _remoteSub?.cancel();
+    await _profileSub?.cancel();
     await _controller.close();
   }
 
@@ -64,6 +76,7 @@ class CustomerRepository {
     final now = DateTime.now().millisecondsSinceEpoch;
     final customer = Customer(
       id: _uuid.v4(),
+      ownerUid: _currentUid,
       name: name,
       phone: phone,
       email: email,
@@ -110,9 +123,16 @@ class CustomerRepository {
     _controller.add(_customers);
   }
 
+  String get _currentUid => _auth.currentUser?.uid ?? '';
+
+  bool get _isGlobal =>
+      _userRepository.currentRole == 'admin' ||
+      _userRepository.currentRole == 'super_admin';
+
   DatabaseReference _ref() {
-    final uid = _auth.currentUser!.uid;
-    return _database.ref('customers/$uid');
+    return _isGlobal
+        ? _database.ref('customers')
+        : _database.ref('customers/$_currentUid');
   }
 
   Future<void> _startRemoteSync() async {
@@ -131,16 +151,45 @@ class CustomerRepository {
     if (value is! Map) return;
     var changed = false;
 
-    for (final entry in value.entries) {
-      final key = entry.key;
-      final data = entry.value;
-      if (key is! String || data is! Map) continue;
+    if (_isGlobal) {
+      for (final userEntry in value.entries) {
+        final ownerUid = userEntry.key;
+        final userData = userEntry.value;
+        if (ownerUid is! String || userData is! Map) continue;
+        for (final entry in userData.entries) {
+          final key = entry.key;
+          final data = entry.value;
+          if (key is! String || data is! Map) continue;
+          final remote = Customer.fromJson(
+            key,
+            ownerUid,
+            data.cast<dynamic, dynamic>(),
+          );
+          final local =
+              await _localDb.getCustomerById(remote.id, ownerUid: ownerUid);
+          if (local == null || remote.updatedAt > local.updatedAt) {
+            await _localDb.upsertCustomer(remote.copyWith(dirty: false));
+            changed = true;
+          }
+        }
+      }
+    } else {
+      for (final entry in value.entries) {
+        final key = entry.key;
+        final data = entry.value;
+        if (key is! String || data is! Map) continue;
 
-      final remote = Customer.fromJson(key, data.cast<dynamic, dynamic>());
-      final local = await _localDb.getCustomerById(remote.id);
-      if (local == null || remote.updatedAt > local.updatedAt) {
-        await _localDb.upsertCustomer(remote.copyWith(dirty: false));
-        changed = true;
+        final remote = Customer.fromJson(
+          key,
+          _currentUid,
+          data.cast<dynamic, dynamic>(),
+        );
+        final local =
+            await _localDb.getCustomerById(remote.id, ownerUid: _currentUid);
+        if (local == null || remote.updatedAt > local.updatedAt) {
+          await _localDb.upsertCustomer(remote.copyWith(dirty: false));
+          changed = true;
+        }
       }
     }
 
@@ -150,20 +199,32 @@ class CustomerRepository {
   }
 
   Future<void> _pushDirtyCustomers() async {
-    final dirtyCustomers = await _localDb.getDirtyCustomers();
+    final dirtyCustomers = await _localDb.getDirtyCustomers(
+      ownerUid: _currentUid,
+      all: _isGlobal,
+    );
     for (final customer in dirtyCustomers) {
       await _pushCustomer(customer);
     }
   }
 
   Future<void> _pushCustomer(Customer customer) async {
-    await _ref().child(customer.id).set(customer.toJson());
+    final ownerUid = customer.ownerUid.isEmpty ? _currentUid : customer.ownerUid;
+    await _database.ref('customers/$ownerUid').child(customer.id).set(
+          customer.toJson(),
+        );
     await _localDb.markCustomerClean(customer.id);
     await _loadLocal();
   }
 
   Future<void> _loadLocal() async {
-    _customers = await _localDb.getAllCustomers();
+    if (!_isGlobal && _currentUid.isNotEmpty) {
+      await _localDb.claimUnownedCustomers(_currentUid);
+    }
+    _customers = await _localDb.getAllCustomers(
+      ownerUid: _currentUid,
+      all: _isGlobal,
+    );
     _controller.add(_customers);
   }
 }

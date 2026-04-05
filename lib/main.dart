@@ -1,5 +1,4 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -63,11 +62,23 @@ class _AppRootState extends State<AppRoot> {
   void initState() {
     super.initState();
     final database = databaseInstance();
-    _customerRepository = CustomerRepository(database: database);
-    _productRepository = ProductRepository(database: database);
-    _vendorRepository = VendorRepository(database: database);
-    _purchaseRepository = PurchaseRepository(database: database);
     _userRepository = UserRepository(database: database);
+    _customerRepository = CustomerRepository(
+      database: database,
+      userRepository: _userRepository,
+    );
+    _productRepository = ProductRepository(
+      database: database,
+      userRepository: _userRepository,
+    );
+    _vendorRepository = VendorRepository(
+      database: database,
+      userRepository: _userRepository,
+    );
+    _purchaseRepository = PurchaseRepository(
+      database: database,
+      userRepository: _userRepository,
+    );
   }
 
   Future<void> _initAll() async {

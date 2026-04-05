@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/customer_repository.dart';
+import '../data/permissions.dart';
 import '../data/product_repository.dart';
 import '../data/purchase_repository.dart';
 import '../data/user_repository.dart';
@@ -20,6 +21,8 @@ class MoreScreen extends StatelessWidget {
     required this.productRepository,
     required this.customerRepository,
     required this.userRepository,
+    required this.permissions,
+    required this.role,
   });
 
   final VendorRepository vendorRepository;
@@ -27,50 +30,72 @@ class MoreScreen extends StatelessWidget {
   final ProductRepository productRepository;
   final CustomerRepository customerRepository;
   final UserRepository userRepository;
+  final Map<String, PermissionSet> permissions;
+  final String role;
 
   @override
   Widget build(BuildContext context) {
-    final modules = [
-      _ModuleTile(
-        title: 'Vendors',
-        subtitle: 'Suppliers and contacts',
-        icon: Icons.storefront,
-        builder: (_) => VendorsScreen(repository: vendorRepository),
-      ),
-      _ModuleTile(
-        title: 'Purchases',
-        subtitle: 'Orders, invoices, approvals',
-        icon: Icons.receipt_long,
-        builder: (_) => PurchasesScreen(repository: purchaseRepository),
-      ),
-      _ModuleTile(
-        title: 'Inventory',
-        subtitle: 'Stock movements and audits',
-        icon: Icons.warehouse,
-        builder: (_) => InventoryScreen(repository: productRepository),
-      ),
-      _ModuleTile(
-        title: 'Approvals',
-        subtitle: 'Workflow and permissions',
-        icon: Icons.verified_user,
-        builder: (_) => const ApprovalsScreen(),
-      ),
-      _ModuleTile(
-        title: 'Reports',
-        subtitle: 'Spending, vendors, stock',
-        icon: Icons.insights,
-        builder: (_) => ReportsScreen(
-          customerRepository: customerRepository,
-          productRepository: productRepository,
-          purchaseRepository: purchaseRepository,
+    bool canView(String module) {
+      if (role == 'super_admin') return true;
+      return permissions[module]?.view ?? false;
+    }
+
+    final modules = <_ModuleTile>[
+      if (canView('vendors'))
+        _ModuleTile(
+          title: 'Vendors',
+          subtitle: 'Suppliers and contacts',
+          icon: Icons.storefront,
+          builder: (_) => VendorsScreen(
+            repository: vendorRepository,
+            permissions: permissions['vendors'],
+          ),
         ),
-      ),
-      _ModuleTile(
-        title: 'Settings',
-        subtitle: 'Teams and preferences',
-        icon: Icons.settings,
-        builder: (_) => SettingsScreen(userRepository: userRepository),
-      ),
+      if (canView('purchases'))
+        _ModuleTile(
+          title: 'Purchases',
+          subtitle: 'Orders, invoices, approvals',
+          icon: Icons.receipt_long,
+          builder: (_) => PurchasesScreen(
+            repository: purchaseRepository,
+            permissions: permissions['purchases'],
+          ),
+        ),
+      if (canView('inventory'))
+        _ModuleTile(
+          title: 'Inventory',
+          subtitle: 'Stock movements and audits',
+          icon: Icons.warehouse,
+          builder: (_) => InventoryScreen(
+            repository: productRepository,
+            permissions: permissions['inventory'],
+          ),
+        ),
+      if (canView('approvals'))
+        _ModuleTile(
+          title: 'Approvals',
+          subtitle: 'Workflow and permissions',
+          icon: Icons.verified_user,
+          builder: (_) => const ApprovalsScreen(),
+        ),
+      if (canView('reports'))
+        _ModuleTile(
+          title: 'Reports',
+          subtitle: 'Spending, vendors, stock',
+          icon: Icons.insights,
+          builder: (_) => ReportsScreen(
+            customerRepository: customerRepository,
+            productRepository: productRepository,
+            purchaseRepository: purchaseRepository,
+          ),
+        ),
+      if (canView('settings'))
+        _ModuleTile(
+          title: 'Settings',
+          subtitle: 'Teams and preferences',
+          icon: Icons.settings,
+          builder: (_) => SettingsScreen(userRepository: userRepository),
+        ),
     ];
 
     return Scaffold(

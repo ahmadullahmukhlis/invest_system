@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import 'local_db.dart';
 import 'product.dart';
+import 'user_repository.dart';
 
 class ProductRepository {
   ProductRepository({
@@ -14,15 +15,18 @@ class ProductRepository {
     FirebaseAuth? auth,
     FirebaseDatabase? database,
     Connectivity? connectivity,
+    required UserRepository userRepository,
   })  : _localDb = localDb ?? LocalDb.instance,
         _auth = auth ?? FirebaseAuth.instance,
         _database = database ?? FirebaseDatabase.instance,
-        _connectivity = connectivity ?? Connectivity();
+        _connectivity = connectivity ?? Connectivity(),
+        _userRepository = userRepository;
 
   final LocalDb _localDb;
   final FirebaseAuth _auth;
   final FirebaseDatabase _database;
   final Connectivity _connectivity;
+  final UserRepository _userRepository;
   final _uuid = const Uuid();
 
   final _controller = StreamController<List<Product>>.broadcast();
@@ -34,6 +38,7 @@ class ProductRepository {
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   StreamSubscription<DatabaseEvent>? _remoteSub;
+  StreamSubscription? _profileSub;
 
   Future<void> init() async {
     await _localDb.init();
@@ -45,11 +50,18 @@ class ProductRepository {
     _connectivitySub = _connectivity.onConnectivityChanged.listen(
       (result) => _handleConnectivity(result),
     );
+    _profileSub = _userRepository.currentUserStream.listen((_) async {
+      await _stopRemoteSync();
+      await _loadLocal();
+      final current = await _connectivity.checkConnectivity();
+      await _handleConnectivity(current);
+    });
   }
 
   Future<void> dispose() async {
     await _connectivitySub?.cancel();
     await _remoteSub?.cancel();
+    await _profileSub?.cancel();
     await _controller.close();
   }
 
@@ -66,6 +78,7 @@ class ProductRepository {
     final now = DateTime.now().millisecondsSinceEpoch;
     final product = Product(
       id: _uuid.v4(),
+      ownerUid: _currentUid,
       name: name,
       sku: sku,
       category: category,
@@ -114,9 +127,16 @@ class ProductRepository {
     _controller.add(_products);
   }
 
+  String get _currentUid => _auth.currentUser?.uid ?? '';
+
+  bool get _isGlobal =>
+      _userRepository.currentRole == 'admin' ||
+      _userRepository.currentRole == 'super_admin';
+
   DatabaseReference _ref() {
-    final uid = _auth.currentUser!.uid;
-    return _database.ref('products/$uid');
+    return _isGlobal
+        ? _database.ref('products')
+        : _database.ref('products/$_currentUid');
   }
 
   Future<void> _startRemoteSync() async {
@@ -135,16 +155,45 @@ class ProductRepository {
     if (value is! Map) return;
     var changed = false;
 
-    for (final entry in value.entries) {
-      final key = entry.key;
-      final data = entry.value;
-      if (key is! String || data is! Map) continue;
+    if (_isGlobal) {
+      for (final userEntry in value.entries) {
+        final ownerUid = userEntry.key;
+        final userData = userEntry.value;
+        if (ownerUid is! String || userData is! Map) continue;
+        for (final entry in userData.entries) {
+          final key = entry.key;
+          final data = entry.value;
+          if (key is! String || data is! Map) continue;
+          final remote = Product.fromJson(
+            key,
+            ownerUid,
+            data.cast<dynamic, dynamic>(),
+          );
+          final local =
+              await _localDb.getProductById(remote.id, ownerUid: ownerUid);
+          if (local == null || remote.updatedAt > local.updatedAt) {
+            await _localDb.upsertProduct(remote.copyWith(dirty: false));
+            changed = true;
+          }
+        }
+      }
+    } else {
+      for (final entry in value.entries) {
+        final key = entry.key;
+        final data = entry.value;
+        if (key is! String || data is! Map) continue;
 
-      final remote = Product.fromJson(key, data.cast<dynamic, dynamic>());
-      final local = await _localDb.getProductById(remote.id);
-      if (local == null || remote.updatedAt > local.updatedAt) {
-        await _localDb.upsertProduct(remote.copyWith(dirty: false));
-        changed = true;
+        final remote = Product.fromJson(
+          key,
+          _currentUid,
+          data.cast<dynamic, dynamic>(),
+        );
+        final local =
+            await _localDb.getProductById(remote.id, ownerUid: _currentUid);
+        if (local == null || remote.updatedAt > local.updatedAt) {
+          await _localDb.upsertProduct(remote.copyWith(dirty: false));
+          changed = true;
+        }
       }
     }
 
@@ -154,20 +203,32 @@ class ProductRepository {
   }
 
   Future<void> _pushDirtyProducts() async {
-    final dirtyProducts = await _localDb.getDirtyProducts();
+    final dirtyProducts = await _localDb.getDirtyProducts(
+      ownerUid: _currentUid,
+      all: _isGlobal,
+    );
     for (final product in dirtyProducts) {
       await _pushProduct(product);
     }
   }
 
   Future<void> _pushProduct(Product product) async {
-    await _ref().child(product.id).set(product.toJson());
+    final ownerUid = product.ownerUid.isEmpty ? _currentUid : product.ownerUid;
+    await _database.ref('products/$ownerUid').child(product.id).set(
+          product.toJson(),
+        );
     await _localDb.markProductClean(product.id);
     await _loadLocal();
   }
 
   Future<void> _loadLocal() async {
-    _products = await _localDb.getAllProducts();
+    if (!_isGlobal && _currentUid.isNotEmpty) {
+      await _localDb.claimUnownedProducts(_currentUid);
+    }
+    _products = await _localDb.getAllProducts(
+      ownerUid: _currentUid,
+      all: _isGlobal,
+    );
     _controller.add(_products);
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/customer_repository.dart';
 import '../data/product_repository.dart';
+import '../data/permissions.dart';
 import '../data/purchase_repository.dart';
 import '../data/user_repository.dart';
 import '../data/vendor_repository.dart';
@@ -35,57 +36,106 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      DashboardScreen(
-        customerRepository: widget.customerRepository,
-        productRepository: widget.productRepository,
-        vendorRepository: widget.vendorRepository,
-        purchaseRepository: widget.purchaseRepository,
-      ),
-      CustomersScreen(repository: widget.customerRepository),
-      ProductsScreen(repository: widget.productRepository),
-      MoreScreen(
-        vendorRepository: widget.vendorRepository,
-        purchaseRepository: widget.purchaseRepository,
-        productRepository: widget.productRepository,
-        customerRepository: widget.customerRepository,
-        userRepository: widget.userRepository,
-      ),
-    ];
+    return StreamBuilder(
+      stream: widget.userRepository.currentUserStream,
+      builder: (context, snapshot) {
+        final profile = snapshot.data ?? widget.userRepository.current;
+        final email = widget.userRepository.currentEmail.toLowerCase();
+        final role = profile?.role ??
+            (email == UserRepository.superAdminEmail
+                ? 'super_admin'
+                : 'viewer');
+        final basePerms = profile?.permissions ?? {};
+        final effectivePerms = basePerms.isEmpty
+            ? defaultPermissionsForRole(role)
+            : basePerms;
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _index,
-        children: pages,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (value) {
-          setState(() => _index = value);
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
+        bool canView(String module) {
+          if (role == 'super_admin') return true;
+          return effectivePerms[module]?.view ?? false;
+        }
+
+        final pages = <Widget>[];
+        final destinations = <NavigationDestination>[];
+
+        pages.add(
+          DashboardScreen(
+            customerRepository: widget.customerRepository,
+            productRepository: widget.productRepository,
+            vendorRepository: widget.vendorRepository,
+            purchaseRepository: widget.purchaseRepository,
           ),
-          NavigationDestination(
+        );
+        destinations.add(const NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home),
+          label: 'Home',
+        ));
+
+        if (canView('customers')) {
+          pages.add(
+            CustomersScreen(
+              repository: widget.customerRepository,
+              permissions: effectivePerms['customers'],
+            ),
+          );
+          destinations.add(const NavigationDestination(
             icon: Icon(Icons.people_outline),
             selectedIcon: Icon(Icons.people),
             label: 'Customers',
-          ),
-          NavigationDestination(
+          ));
+        }
+
+        if (canView('products')) {
+          pages.add(
+            ProductsScreen(
+              repository: widget.productRepository,
+              permissions: effectivePerms['products'],
+            ),
+          );
+          destinations.add(const NavigationDestination(
             icon: Icon(Icons.inventory_2_outlined),
             selectedIcon: Icon(Icons.inventory_2),
             label: 'Products',
+          ));
+        }
+
+        pages.add(
+          MoreScreen(
+            vendorRepository: widget.vendorRepository,
+            purchaseRepository: widget.purchaseRepository,
+            productRepository: widget.productRepository,
+            customerRepository: widget.customerRepository,
+            userRepository: widget.userRepository,
+            permissions: effectivePerms,
+            role: role,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.grid_view_outlined),
-            selectedIcon: Icon(Icons.grid_view),
-            label: 'More',
+        );
+        destinations.add(const NavigationDestination(
+          icon: Icon(Icons.grid_view_outlined),
+          selectedIcon: Icon(Icons.grid_view),
+          label: 'More',
+        ));
+
+        final safeIndex = _index.clamp(0, pages.length - 1);
+        if (safeIndex != _index) {
+          _index = safeIndex;
+        }
+
+        return Scaffold(
+          body: IndexedStack(
+            index: _index,
+            children: pages,
           ),
-        ],
-      ),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _index,
+            onDestinationSelected: (value) {
+              setState(() => _index = value);
+            },
+            destinations: destinations,
+          ),
+        );
+      },
     );
   }
 }

@@ -3,11 +3,17 @@ import 'package:intl/intl.dart';
 
 import '../data/purchase.dart';
 import '../data/purchase_repository.dart';
+import '../data/permissions.dart';
 
 class PurchasesScreen extends StatefulWidget {
-  const PurchasesScreen({super.key, required this.repository});
+  const PurchasesScreen({
+    super.key,
+    required this.repository,
+    required this.permissions,
+  });
 
   final PurchaseRepository repository;
+  final PermissionSet? permissions;
 
   @override
   State<PurchasesScreen> createState() => _PurchasesScreenState();
@@ -20,6 +26,8 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final perms = widget.permissions ??
+        PermissionSet(view: false, create: false, edit: false, remove: false);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Purchases'),
@@ -85,7 +93,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
                         ],
                       ),
                       child: InkWell(
-                        onTap: () => _openForm(purchase),
+                        onTap: perms.edit ? () => _openForm(purchase) : null,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -143,7 +151,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _openForm(null),
+        onPressed: perms.create ? () => _openForm(null) : null,
         child: const Icon(Icons.add),
       ),
     );

@@ -1,6 +1,7 @@
 class Customer {
   Customer({
     required this.id,
+    required this.ownerUid,
     required this.name,
     required this.phone,
     required this.email,
@@ -12,6 +13,7 @@ class Customer {
   });
 
   final String id;
+  final String ownerUid;
   final String name;
   final String phone;
   final String email;
@@ -23,6 +25,7 @@ class Customer {
 
   Customer copyWith({
     String? id,
+    String? ownerUid,
     String? name,
     String? phone,
     String? email,
@@ -34,6 +37,7 @@ class Customer {
   }) {
     return Customer(
       id: id ?? this.id,
+      ownerUid: ownerUid ?? this.ownerUid,
       name: name ?? this.name,
       phone: phone ?? this.phone,
       email: email ?? this.email,
@@ -48,6 +52,7 @@ class Customer {
   Map<String, Object?> toMap() {
     return {
       'id': id,
+      'owner_uid': ownerUid,
       'name': name,
       'phone': phone,
       'email': email,
@@ -62,6 +67,7 @@ class Customer {
   static Customer fromMap(Map<String, Object?> map) {
     return Customer(
       id: map['id'] as String,
+      ownerUid: (map['owner_uid'] as String?) ?? '',
       name: (map['name'] as String?) ?? '',
       phone: (map['phone'] as String?) ?? '',
       email: (map['email'] as String?) ?? '',
@@ -85,9 +91,14 @@ class Customer {
     };
   }
 
-  static Customer fromJson(String id, Map<dynamic, dynamic> json) {
+  static Customer fromJson(
+    String id,
+    String ownerUid,
+    Map<dynamic, dynamic> json,
+  ) {
     return Customer(
       id: id,
+      ownerUid: ownerUid,
       name: (json['name'] as String?) ?? '',
       phone: (json['phone'] as String?) ?? '',
       email: (json['email'] as String?) ?? '',

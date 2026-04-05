@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
+import 'permissions.dart';
 import 'user_profile.dart';
 
 class UserRepository {
@@ -26,6 +27,11 @@ class UserRepository {
 
   UserProfile? _current;
   UserProfile? get current => _current;
+  String get currentEmail => _auth.currentUser?.email ?? '';
+  String get currentRole {
+    if (_current != null) return _current!.role;
+    return currentEmail.toLowerCase() == superAdminEmail ? 'super_admin' : 'viewer';
+  }
 
   Future<void> init() async {
     await ensureCurrentUserProfile();
@@ -41,18 +47,36 @@ class UserRepository {
 
   DatabaseReference _usersRef() => _database.ref('users');
 
+  static const superAdminEmail = 'admin@admin.admin';
+
   Future<void> ensureCurrentUserProfile() async {
     final user = _auth.currentUser;
     if (user == null) return;
     final ref = _usersRef().child(user.uid);
     final snapshot = await ref.get();
-    if (snapshot.exists) return;
+    if (snapshot.exists) {
+      final email = (user.email ?? '').toLowerCase();
+      if (email == superAdminEmail) {
+        await ref.update({
+          'role': 'super_admin',
+          'permissions': defaultPermissionsForRole('super_admin')
+              .map((k, v) => MapEntry(k, v.toJson())),
+          'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        });
+      }
+      return;
+    }
 
+    final email = user.email ?? '';
+    final role = email.toLowerCase() == superAdminEmail
+        ? 'super_admin'
+        : 'viewer';
     final profile = UserProfile(
       uid: user.uid,
       name: user.displayName ?? '',
-      email: user.email ?? '',
-      role: 'staff',
+      email: email,
+      role: role,
+      permissions: defaultPermissionsForRole(role),
       updatedAt: DateTime.now().millisecondsSinceEpoch,
     );
     await ref.set(profile.toJson());
@@ -71,8 +95,20 @@ class UserRepository {
   }
 
   Future<void> updateUserRole(String uid, String role) async {
+    final permissions = defaultPermissionsForRole(role);
     await _usersRef().child(uid).update({
       'role': role,
+      'permissions': permissions.map((k, v) => MapEntry(k, v.toJson())),
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  Future<void> updateUserPermissions(
+    String uid,
+    Map<String, PermissionSet> permissions,
+  ) async {
+    await _usersRef().child(uid).update({
+      'permissions': permissions.map((k, v) => MapEntry(k, v.toJson())),
       'updatedAt': DateTime.now().millisecondsSinceEpoch,
     });
   }
@@ -84,7 +120,18 @@ class UserRepository {
     _currentSub = _usersRef().child(user.uid).onValue.listen((event) {
       final value = event.snapshot.value;
       if (value is Map) {
-        _current = UserProfile.fromJson(user.uid, value.cast<dynamic, dynamic>());
+        final profile =
+            UserProfile.fromJson(user.uid, value.cast<dynamic, dynamic>());
+        if (profile.permissions.isEmpty) {
+          final defaults = defaultPermissionsForRole(profile.role);
+          _usersRef().child(user.uid).update({
+            'permissions': defaults.map((k, v) => MapEntry(k, v.toJson())),
+            'updatedAt': DateTime.now().millisecondsSinceEpoch,
+          });
+          _current = profile.copyWith(permissions: defaults);
+        } else {
+          _current = profile;
+        }
         _currentController.add(_current);
       }
     });

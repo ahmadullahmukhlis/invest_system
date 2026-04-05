@@ -1,6 +1,7 @@
 class Purchase {
   Purchase({
     required this.id,
+    required this.ownerUid,
     required this.vendorName,
     required this.reference,
     required this.total,
@@ -12,6 +13,7 @@ class Purchase {
   });
 
   final String id;
+  final String ownerUid;
   final String vendorName;
   final String reference;
   final double total;
@@ -23,6 +25,7 @@ class Purchase {
 
   Purchase copyWith({
     String? id,
+    String? ownerUid,
     String? vendorName,
     String? reference,
     double? total,
@@ -34,6 +37,7 @@ class Purchase {
   }) {
     return Purchase(
       id: id ?? this.id,
+      ownerUid: ownerUid ?? this.ownerUid,
       vendorName: vendorName ?? this.vendorName,
       reference: reference ?? this.reference,
       total: total ?? this.total,
@@ -48,6 +52,7 @@ class Purchase {
   Map<String, Object?> toMap() {
     return {
       'id': id,
+      'owner_uid': ownerUid,
       'vendor_name': vendorName,
       'reference': reference,
       'total': total,
@@ -68,6 +73,7 @@ class Purchase {
 
     return Purchase(
       id: map['id'] as String,
+      ownerUid: (map['owner_uid'] as String?) ?? '',
       vendorName: (map['vendor_name'] as String?) ?? '',
       reference: (map['reference'] as String?) ?? '',
       total: asDouble(map['total']),
@@ -91,7 +97,11 @@ class Purchase {
     };
   }
 
-  static Purchase fromJson(String id, Map<dynamic, dynamic> json) {
+  static Purchase fromJson(
+    String id,
+    String ownerUid,
+    Map<dynamic, dynamic> json,
+  ) {
     double asDouble(Object? value) {
       if (value is int) return value.toDouble();
       if (value is double) return value;
@@ -100,6 +110,7 @@ class Purchase {
 
     return Purchase(
       id: id,
+      ownerUid: ownerUid,
       vendorName: (json['vendorName'] as String?) ?? '',
       reference: (json['reference'] as String?) ?? '',
       total: asDouble(json['total']),

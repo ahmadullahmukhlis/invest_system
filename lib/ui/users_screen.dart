@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/permissions.dart';
 import '../data/user_profile.dart';
 import '../data/user_repository.dart';
 
@@ -22,7 +23,8 @@ class _UsersScreenState extends State<UsersScreen> {
   @override
   Widget build(BuildContext context) {
     final current = widget.userRepository.current;
-    if (current == null || current.role != 'admin') {
+    if (current == null ||
+        (current.role != 'admin' && current.role != 'super_admin')) {
       return Scaffold(
         appBar: AppBar(title: const Text('User Management')),
         body: const Center(
@@ -30,6 +32,7 @@ class _UsersScreenState extends State<UsersScreen> {
         ),
       );
     }
+    final canGrantSuperAdmin = current.role == 'super_admin';
 
     return Scaffold(
       appBar: AppBar(title: const Text('User Management')),
@@ -85,20 +88,53 @@ class _UsersScreenState extends State<UsersScreen> {
                                 .bodySmall
                                 ?.copyWith(color: Colors.black54),
                           ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              DropdownButton<String>(
+                                value: user.role,
+                                items: [
+                                  if (canGrantSuperAdmin)
+                                    const DropdownMenuItem(
+                                      value: 'super_admin',
+                                      child: Text('Super Admin'),
+                                    ),
+                                  const DropdownMenuItem(
+                                    value: 'admin',
+                                    child: Text('Admin'),
+                                  ),
+                                  const DropdownMenuItem(
+                                    value: 'manager',
+                                    child: Text('Manager'),
+                                  ),
+                                  const DropdownMenuItem(
+                                    value: 'staff',
+                                    child: Text('Staff'),
+                                  ),
+                                  const DropdownMenuItem(
+                                    value: 'viewer',
+                                    child: Text('Viewer'),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  if (value == 'super_admin' &&
+                                      !canGrantSuperAdmin) {
+                                    return;
+                                  }
+                                  widget.userRepository
+                                      .updateUserRole(user.uid, value);
+                                },
+                              ),
+                              const SizedBox(width: 12),
+                              OutlinedButton(
+                                onPressed: () => _editPermissions(user),
+                                child: const Text('Permissions'),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
-                    ),
-                    DropdownButton<String>(
-                      value: user.role,
-                      items: const [
-                        DropdownMenuItem(value: 'admin', child: Text('Admin')),
-                        DropdownMenuItem(value: 'manager', child: Text('Manager')),
-                        DropdownMenuItem(value: 'staff', child: Text('Staff')),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        widget.userRepository.updateUserRole(user.uid, value);
-                      },
                     ),
                   ],
                 ),
@@ -107,6 +143,117 @@ class _UsersScreenState extends State<UsersScreen> {
           );
         },
       ),
+    );
+  }
+
+  Future<void> _editPermissions(UserProfile user) async {
+    final permissions = Map<String, PermissionSet>.from(user.permissions);
+    for (final module in modules) {
+      permissions.putIfAbsent(
+        module,
+        () => PermissionSet(view: false, create: false, edit: false, remove: false),
+      );
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.all(16),
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  Text(
+                    'Permissions: ${user.name.isEmpty ? user.email : user.name}',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 12),
+                  for (final module in modules) ...[
+                    Text(
+                      module.toUpperCase(),
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        _permChip(
+                          label: 'View',
+                          value: permissions[module]!.view,
+                          onChanged: (value) {
+                            setModalState(() {
+                              permissions[module] =
+                                  permissions[module]!.copyWith(view: value);
+                            });
+                          },
+                        ),
+                        _permChip(
+                          label: 'Create',
+                          value: permissions[module]!.create,
+                          onChanged: (value) {
+                            setModalState(() {
+                              permissions[module] =
+                                  permissions[module]!.copyWith(create: value);
+                            });
+                          },
+                        ),
+                        _permChip(
+                          label: 'Edit',
+                          value: permissions[module]!.edit,
+                          onChanged: (value) {
+                            setModalState(() {
+                              permissions[module] =
+                                  permissions[module]!.copyWith(edit: value);
+                            });
+                          },
+                        ),
+                        _permChip(
+                          label: 'Delete',
+                          value: permissions[module]!.remove,
+                          onChanged: (value) {
+                            setModalState(() {
+                              permissions[module] =
+                                  permissions[module]!.copyWith(remove: value);
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  FilledButton(
+                    onPressed: () async {
+                      await widget.userRepository
+                          .updateUserPermissions(user.uid, permissions);
+                      if (mounted) Navigator.of(context).pop();
+                    },
+                    child: const Text('Save Permissions'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _permChip({
+    required String label,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return FilterChip(
+      label: Text(label),
+      selected: value,
+      onSelected: onChanged,
     );
   }
 }
