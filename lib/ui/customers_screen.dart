@@ -153,6 +153,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_customers',
         onPressed: perms.create ? () => _openForm(null) : null,
         child: const Icon(Icons.add),
       ),

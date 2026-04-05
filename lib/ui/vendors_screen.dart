@@ -153,6 +153,7 @@ class _VendorsScreenState extends State<VendorsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_vendors',
         onPressed: perms.create ? () => _openForm(null) : null,
         child: const Icon(Icons.add),
       ),

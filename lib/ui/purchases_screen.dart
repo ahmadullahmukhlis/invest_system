@@ -159,6 +159,7 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_purchases',
         onPressed: perms.create ? () => _openForm(null) : null,
         child: const Icon(Icons.add),
       ),

@@ -156,6 +156,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_products',
         onPressed: perms.create ? () => _openForm(null) : null,
         child: const Icon(Icons.add),
       ),
