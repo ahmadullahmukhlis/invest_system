@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "816397432153",
+    "firebase_url": "https://realt-time-database-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "realt-time-database",
+    "storage_bucket": "realt-time-database.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:816397432153:android:dd82556830e362258e0848",
+        "android_client_info": {
+          "package_name": "com.example.invest_system"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "816397432153-q1fd9kaap3iv4t7c5f7j7q5c41hhh6u2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5b4I4ovuq3Fgti2aYO0PUJWV0-2D3MbM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "816397432153-q1fd9kaap3iv4t7c5f7j7q5c41hhh6u2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
