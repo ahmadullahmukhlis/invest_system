@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart' as pdfs;
 import 'package:printing/printing.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -51,118 +52,101 @@ class SaleReceiptScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.accent.withOpacity(0.15),
-                  AppColors.indigo.withOpacity(0.08),
-                ],
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.receipt_long_outlined,
-                    color: AppColors.accent,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Text(
-                        'Sale Receipt',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w700),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.receipt_long_outlined,
+                          color: AppColors.accent,
+                        ),
                       ),
-                      Text(
-                        'Receipt ID: ${sale.id}',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Sale Receipt',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              'Receipt ID: ${sale.id}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          formatDate(sale.date),
+                          style: const TextStyle(
+                            color: AppColors.success,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  _InfoGroup(
+                    title: 'Customer',
+                    items: [
+                      _InfoItem('Name', customerName),
+                      _InfoItem('Phone', customer?.phone ?? '-'),
+                      _InfoItem(
+                        'Location',
+                        customer == null
+                            ? '-'
+                            : '${customer.province}, ${customer.district}',
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    formatDate(sale.date),
-                    style: const TextStyle(
-                      color: AppColors.success,
-                      fontWeight: FontWeight.w600,
+                  const SizedBox(height: 12),
+                  _InfoGroup(
+                    title: 'Sale Details',
+                    items: [
+                      _InfoItem('Quantity', '${sale.quantityValue} $unitName'),
+                      _InfoItem(
+                          'Price per unit', formatMoney(sale.pricePerUnit)),
+                      _InfoItem('Total', formatMoney(sale.totalPrice)),
+                      _InfoItem('Paid', formatMoney(paid)),
+                      _InfoItem('Balance', formatMoney(balance)),
+                    ],
+                  ),
+                  if (sale.note != null && sale.note!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _InfoGroup(
+                      title: 'Note',
+                      items: [
+                        _InfoItem('Message', sale.note!),
+                      ],
                     ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _StatChip(label: 'Total', value: formatMoney(sale.totalPrice)),
-              _StatChip(label: 'Paid', value: formatMoney(paid)),
-              _StatChip(label: 'Balance', value: formatMoney(balance)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _InfoGroup(
-            title: 'Customer',
-            items: [
-              _InfoItem('Name', customerName),
-              _InfoItem('Phone', customer?.phone ?? '-'),
-              _InfoItem(
-                'Location',
-                customer == null
-                    ? '-'
-                    : '${customer.province}, ${customer.district}',
+                  ],
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _InfoGroup(
-            title: 'Sale Details',
-            items: [
-              _InfoItem('Quantity', '${sale.quantityValue} $unitName'),
-              _InfoItem('Price per unit', formatMoney(sale.pricePerUnit)),
-              _InfoItem('Total', formatMoney(sale.totalPrice)),
-              _InfoItem('Paid', formatMoney(paid)),
-              _InfoItem('Balance', formatMoney(balance)),
-            ],
-          ),
-          if (sale.note != null && sale.note!.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _InfoGroup(
-              title: 'Note',
-              items: [
-                _InfoItem('Message', sale.note!),
-              ],
             ),
-          ],
-          const SizedBox(height: 12),
-          _PaymentsCard(
-            title: 'Payment History',
-            payments: related,
-            emptyText: 'No payments recorded for this sale.',
           ),
         ],
       ),
@@ -179,6 +163,10 @@ class SaleReceiptScreen extends ConsumerWidget {
                     unitName: unitName,
                     paid: paid,
                     balance: balance,
+                    phone: customer?.phone,
+                    location: customer == null
+                        ? null
+                        : '${customer.province}, ${customer.district}',
                     note: sale.note,
                   );
                   await Printing.sharePdf(
@@ -200,6 +188,10 @@ class SaleReceiptScreen extends ConsumerWidget {
                     unitName: unitName,
                     paid: paid,
                     balance: balance,
+                    phone: customer?.phone,
+                    location: customer == null
+                        ? null
+                        : '${customer.province}, ${customer.district}',
                     note: sale.note,
                   );
                   final path = await savePdfToDownloads(
@@ -292,109 +284,6 @@ class _InfoItem {
   final String value;
 }
 
-class _StatChip extends StatelessWidget {
-  const _StatChip({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.muted,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: Theme.of(context)
-                .textTheme
-                .titleSmall
-                ?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PaymentsCard extends StatelessWidget {
-  const _PaymentsCard({
-    required this.title,
-    required this.payments,
-    required this.emptyText,
-  });
-
-  final String title;
-  final List<dynamic> payments;
-  final String emptyText;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            if (payments.isEmpty)
-              Text(
-                emptyText,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.muted,
-                    ),
-              )
-            else
-              Column(
-                children: [
-                  for (final payment in payments) ...[
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.payments_outlined,
-                          color: AppColors.success,
-                          size: 18,
-                        ),
-                      ),
-                      title: Text(formatMoney(payment.amount)),
-                      subtitle: Text(formatDate(payment.date)),
-                    ),
-                    const Divider(height: 1),
-                  ],
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 Future<Uint8List> _buildSalePdf({
   required Sale sale,
@@ -402,37 +291,113 @@ Future<Uint8List> _buildSalePdf({
   required String unitName,
   required double paid,
   required double balance,
+  String? phone,
+  String? location,
   String? note,
 }) async {
+  final baseFont = await PdfGoogleFonts.nunitoRegular();
+  final boldFont = await PdfGoogleFonts.nunitoBold();
+  final accent = pdfs.PdfColor.fromInt(0xFF3F8CFF);
+  final indigo = pdfs.PdfColor.fromInt(0xFF1F2A44);
+  final success = pdfs.PdfColor.fromInt(0xFF1F9D55);
+  final muted = pdfs.PdfColor.fromInt(0xFF6B7280);
+  final border = pdfs.PdfColor.fromInt(0xFFE5E7EB);
   final pdf = pw.Document();
   pdf.addPage(
     pw.Page(
+      theme: pw.ThemeData.withFont(base: baseFont, bold: boldFont),
       build: (context) {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text('Sale Receipt',
-                style: pw.TextStyle(
-                    fontSize: 20, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 6),
-            pw.Text('Receipt ID: ${sale.id}'),
-            pw.Text('Date: ${formatDate(sale.date)}'),
+            pw.Container(
+              padding: const pw.EdgeInsets.all(14),
+              decoration: pw.BoxDecoration(
+                color: pdfs.PdfColor.fromInt(0xFFF5F7FF),
+                borderRadius: pw.BorderRadius.circular(12),
+                border: pw.Border.all(color: border),
+              ),
+              child: pw.Row(
+                children: [
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(8),
+                    decoration: pw.BoxDecoration(
+                      color: pdfs.PdfColor.fromInt(0xFFE8F0FF),
+                      borderRadius: pw.BorderRadius.circular(8),
+                    ),
+                    child: pw.Text('SR',
+                        style: pw.TextStyle(
+                            color: accent,
+                            fontWeight: pw.FontWeight.bold)),
+                  ),
+                  pw.SizedBox(width: 10),
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('Sale Receipt',
+                            style: pw.TextStyle(
+                                fontSize: 18,
+                                fontWeight: pw.FontWeight.bold,
+                                color: indigo)),
+                        pw.Text('Receipt ID: ${sale.id}',
+                            style: pw.TextStyle(color: muted)),
+                      ],
+                    ),
+                  ),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: pw.BoxDecoration(
+                      color: pdfs.PdfColor.fromInt(0xFFE8F6EE),
+                      borderRadius: pw.BorderRadius.circular(12),
+                    ),
+                    child: pw.Text(formatDate(sale.date),
+                        style: pw.TextStyle(
+                            color: success, fontWeight: pw.FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
             pw.SizedBox(height: 12),
-            pw.Divider(),
-            pw.Text('Customer', style: pw.TextStyle(fontSize: 14)),
-            pw.SizedBox(height: 6),
-            pw.Text('Name: $customerName'),
+            pw.Row(
+              children: [
+                _pdfStat('Total', formatMoney(sale.totalPrice), border),
+                pw.SizedBox(width: 8),
+                _pdfStat('Paid', formatMoney(paid), border),
+                pw.SizedBox(width: 8),
+                _pdfStat('Balance', formatMoney(balance), border),
+              ],
+            ),
             pw.SizedBox(height: 12),
-            pw.Text('Sale Details', style: pw.TextStyle(fontSize: 14)),
-            pw.SizedBox(height: 6),
-            pw.Text('Quantity: ${sale.quantityValue} $unitName'),
-            pw.Text('Price per unit: ${formatMoney(sale.pricePerUnit)}'),
-            pw.Text('Total: ${formatMoney(sale.totalPrice)}'),
-            pw.Text('Paid: ${formatMoney(paid)}'),
-            pw.Text('Balance: ${formatMoney(balance)}'),
+            _pdfSection(
+              title: 'Customer',
+              border: border,
+              items: {
+                'Name': customerName,
+                'Phone': phone?.isNotEmpty == true ? phone! : '-',
+                'Location': location?.isNotEmpty == true ? location! : '-',
+              },
+            ),
+            pw.SizedBox(height: 10),
+            _pdfSection(
+              title: 'Sale Details',
+              border: border,
+              items: {
+                'Quantity': '${sale.quantityValue} $unitName',
+                'Price per unit': formatMoney(sale.pricePerUnit),
+                'Total': formatMoney(sale.totalPrice),
+                'Paid': formatMoney(paid),
+                'Balance': formatMoney(balance),
+              },
+            ),
             if (note != null && note.isNotEmpty) ...[
-              pw.SizedBox(height: 12),
-              pw.Text('Note: $note'),
+              pw.SizedBox(height: 10),
+              _pdfSection(
+                title: 'Note',
+                border: border,
+                items: {'Message': note},
+              ),
             ],
           ],
         );
@@ -440,4 +405,73 @@ Future<Uint8List> _buildSalePdf({
     ),
   );
   return pdf.save();
+}
+
+pw.Widget _pdfSection({
+  required String title,
+  required pdfs.PdfColor border,
+  required Map<String, String> items,
+}) {
+  return pw.Container(
+    padding: const pw.EdgeInsets.all(10),
+    decoration: pw.BoxDecoration(
+      border: pw.Border.all(color: border),
+      borderRadius: pw.BorderRadius.circular(10),
+      color: pdfs.PdfColor.fromInt(0xFFFFFFFF),
+    ),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(title,
+            style: pw.TextStyle(
+                fontSize: 12, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 6),
+        for (final entry in items.entries)
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 2),
+            child: pw.Row(
+              children: [
+                pw.Expanded(
+                  child: pw.Text(entry.key,
+                      style: pw.TextStyle(
+                          fontSize: 10,
+                          color: pdfs.PdfColor.fromInt(0xFF6B7280))),
+                ),
+                pw.SizedBox(width: 8),
+                pw.Expanded(
+                  child: pw.Text(entry.value,
+                      textAlign: pw.TextAlign.right,
+                      style:  pw.TextStyle(
+                          fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+pw.Widget _pdfStat(String label, String value, pdfs.PdfColor border) {
+  return pw.Expanded(
+    child: pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: border),
+        borderRadius: pw.BorderRadius.circular(10),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(label,
+              style: pw.TextStyle(
+                  fontSize: 9, color: pdfs.PdfColor.fromInt(0xFF6B7280))),
+          pw.SizedBox(height: 3),
+          pw.Text(value,
+              style: pw.TextStyle(
+                  fontSize: 11, fontWeight: pw.FontWeight.bold)),
+        ],
+      ),
+    ),
+  );
 }

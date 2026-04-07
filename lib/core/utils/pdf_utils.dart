@@ -10,14 +10,17 @@ Future<String?> savePdfToDownloads({
   required String fileName,
 }) async {
   if (Platform.isAndroid) {
-    final status = await Permission.storage.request();
+    final status = await (await Permission.manageExternalStorage.request());
     if (!status.isGranted) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Storage permission denied.')),
-        );
+      final legacy = await Permission.storage.request();
+      if (!legacy.isGranted) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Storage permission denied.')),
+          );
+        }
+        return null;
       }
-      return null;
     }
   }
 
