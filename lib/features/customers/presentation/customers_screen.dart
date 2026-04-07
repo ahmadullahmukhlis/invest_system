@@ -88,107 +88,109 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                   icon: Icons.person_outline,
                 )
               else
-                Card(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final customer = filtered[index];
-                      final customerSales = sales
-                          .where((sale) => sale.customerId == customer.id)
-                          .fold(0.0, (sum, item) => sum + item.totalPrice);
-                      final customerPayments = payments
-                          .where((payment) => payment.customerId == customer.id)
-                          .fold(0.0, (sum, item) => sum + item.amount);
-                      final balance = customerSales - customerPayments;
-
-                      return ListTile(
-                        title: Text(customer.name),
-                        subtitle: Text(
-                          '${customer.phone} • ${customer.province}, ${customer.district}',
-                        ),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) async {
-                            if (value == 'details') {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => CustomerLedgerScreen(
-                                    customer: customer,
+                Column(
+                  children: [
+                    for (final customer in filtered) ...[
+                      Builder(
+                        builder: (context) {
+                          final customerSales = sales
+                              .where((sale) => sale.customerId == customer.id)
+                              .fold(0.0, (sum, item) => sum + item.totalPrice);
+                          final customerPayments = payments
+                              .where((payment) =>
+                                  payment.customerId == customer.id)
+                              .fold(0.0, (sum, item) => sum + item.amount);
+                          final balance = customerSales - customerPayments;
+                          return Card(
+                            child: ListTile(
+                              title: Text(customer.name),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${customer.phone} • ${customer.province}, ${customer.district}',
                                   ),
-                                ),
-                              );
-                              return;
-                            }
-                            final canEdit = await ref
-                                .read(customerRepositoryProvider)
-                                .canEdit(customer.id);
-                            if (!canEdit) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'You can only edit your own records.'),
+                                  Text(
+                                    'Balance: ${formatMoney(balance)}',
+                                  ),
+                                ],
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) async {
+                                  if (value == 'details') {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => CustomerLedgerScreen(
+                                          customer: customer,
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  final canEdit = await ref
+                                      .read(customerRepositoryProvider)
+                                      .canEdit(customer.id);
+                                  if (!canEdit) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'You can only edit your own records.'),
+                                        ),
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  if (value == 'edit') {
+                                    final updated = await showDialog<Customer>(
+                                      context: context,
+                                      builder: (context) => CustomerFormDialog(
+                                        existing: customer,
+                                      ),
+                                    );
+                                    if (updated != null) {
+                                      await ref
+                                          .read(customerRepositoryProvider)
+                                          .upsert(updated);
+                                    }
+                                  }
+                                  if (value == 'delete') {
+                                    final confirm = await _confirmDelete(context);
+                                    if (confirm) {
+                                      await ref
+                                          .read(customerRepositoryProvider)
+                                          .deleteById(customer.id);
+                                    }
+                                  }
+                                },
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(
+                                    value: 'details',
+                                    child: Text('Details'),
+                                  ),
+                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => CustomerLedgerScreen(
+                                      customer: customer,
+                                    ),
                                   ),
                                 );
-                              }
-                              return;
-                            }
-                            if (value == 'edit') {
-                              final updated = await showDialog<Customer>(
-                                context: context,
-                                builder: (context) => CustomerFormDialog(
-                                  existing: customer,
-                                ),
-                              );
-                              if (updated != null) {
-                                await ref
-                                    .read(customerRepositoryProvider)
-                                    .upsert(updated);
-                              }
-                            }
-                            if (value == 'delete') {
-                              final confirm = await _confirmDelete(context);
-                              if (confirm) {
-                                await ref
-                                    .read(customerRepositoryProvider)
-                                    .deleteById(customer.id);
-                              }
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            PopupMenuItem(
-                              enabled: false,
-                              child: Text('Balance: ${formatMoney(balance)}'),
-                            ),
-                            const PopupMenuDivider(),
-                            const PopupMenuItem(
-                              value: 'details',
-                              child: Text('Details'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: Text('Edit'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Text('Delete'),
-                            ),
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => CustomerLedgerScreen(
-                                customer: customer,
-                              ),
+                              },
                             ),
                           );
                         },
-                      );
-                    },
-                  ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                 ),
             ],
           ),

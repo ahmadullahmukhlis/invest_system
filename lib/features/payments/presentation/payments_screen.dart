@@ -70,103 +70,107 @@ class PaymentsScreen extends ConsumerWidget {
                   icon: Icons.payments_outlined,
                 )
               else
-                Card(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: payments.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final payment = payments[index];
-                      Customer? customer;
-                      if (customers.isNotEmpty) {
-                        final matches = customers
-                            .where((item) => item.id == payment.customerId);
-                        customer =
-                            matches.isEmpty ? customers.first : matches.first;
-                      }
-                      final customerName = customer?.name ?? 'Unknown';
-                      final customerSales = sales
-                          .where((sale) => sale.customerId == payment.customerId)
-                          .fold(0.0, (sum, item) => sum + item.totalPrice);
-                      final customerPayments = payments
-                          .where((p) => p.customerId == payment.customerId)
-                          .fold(0.0, (sum, item) => sum + item.amount);
-                      final customerBalance = customerSales - customerPayments;
-                      Sale? sale;
-                      if (payment.saleId != null) {
-                        final matches =
-                            sales.where((s) => s.id == payment.saleId);
-                        sale = matches.isEmpty ? null : matches.first;
-                      }
-                      return ListTile(
-                        title: Text(customerName),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${formatDate(payment.date)} • ${formatMoney(payment.amount)}',
-                            ),
-                            Text('Total Sales: ${formatMoney(customerSales)}'),
-                            Text(
-                                'Total Payments: ${formatMoney(customerPayments)}'),
-                            Text(
-                                'Remaining Balance: ${formatMoney(customerBalance)}'),
-                            if (sale != null)
-                              Text(
-                                'Sale: ${formatDate(sale.date)} • ${formatMoney(sale.totalPrice)}',
-                              ),
-                          ],
-                        ),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) async {
-                            final canEdit = await ref
-                                .read(paymentRepositoryProvider)
-                                .canEdit(payment.id);
-                            if (!canEdit) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'You can only edit your own records.'),
+                Column(
+                  children: [
+                    for (final payment in payments) ...[
+                      Builder(
+                        builder: (context) {
+                          Customer? customer;
+                          if (customers.isNotEmpty) {
+                            final matches = customers.where(
+                                (item) => item.id == payment.customerId);
+                            customer =
+                                matches.isEmpty ? customers.first : matches.first;
+                          }
+                          final customerName = customer?.name ?? 'Unknown';
+                          final customerSales = sales
+                              .where(
+                                  (sale) => sale.customerId == payment.customerId)
+                              .fold(0.0, (sum, item) => sum + item.totalPrice);
+                          final customerPayments = payments
+                              .where((p) => p.customerId == payment.customerId)
+                              .fold(0.0, (sum, item) => sum + item.amount);
+                          final customerBalance =
+                              customerSales - customerPayments;
+                          Sale? sale;
+                          if (payment.saleId != null) {
+                            final matches =
+                                sales.where((s) => s.id == payment.saleId);
+                            sale = matches.isEmpty ? null : matches.first;
+                          }
+                          return Card(
+                            child: ListTile(
+                              title: Text(customerName),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${formatDate(payment.date)} • ${formatMoney(payment.amount)}',
                                   ),
-                                );
-                              }
-                              return;
-                            }
-                            if (value == 'edit') {
-                              final updated = await showDialog<Payment>(
-                                context: context,
-                                builder: (_) => _PaymentFormDialog(
-                                  customers: customers,
-                                  sales: sales,
-                                  payments: payments,
-                                  existing: payment,
-                                ),
-                              );
-                              if (updated != null) {
-                                await ref
-                                    .read(paymentRepositoryProvider)
-                                    .upsert(updated);
-                              }
-                            }
-                            if (value == 'delete') {
-                              final confirm = await _confirmDelete(context);
-                              if (confirm) {
-                                await ref
-                                    .read(paymentRepositoryProvider)
-                                    .deleteById(payment.id);
-                              }
-                            }
-                          },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(value: 'edit', child: Text('Edit')),
-                            PopupMenuItem(value: 'delete', child: Text('Delete')),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                                  Text('Total Sales: ${formatMoney(customerSales)}'),
+                                  Text(
+                                      'Total Payments: ${formatMoney(customerPayments)}'),
+                                  Text(
+                                      'Remaining Balance: ${formatMoney(customerBalance)}'),
+                                  if (sale != null)
+                                    Text(
+                                      'Sale: ${formatDate(sale.date)} • ${formatMoney(sale.totalPrice)}',
+                                    ),
+                                ],
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) async {
+                                  final canEdit = await ref
+                                      .read(paymentRepositoryProvider)
+                                      .canEdit(payment.id);
+                                  if (!canEdit) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'You can only edit your own records.'),
+                                        ),
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  if (value == 'edit') {
+                                    final updated = await showDialog<Payment>(
+                                      context: context,
+                                      builder: (_) => _PaymentFormDialog(
+                                        customers: customers,
+                                        sales: sales,
+                                        payments: payments,
+                                        existing: payment,
+                                      ),
+                                    );
+                                    if (updated != null) {
+                                      await ref
+                                          .read(paymentRepositoryProvider)
+                                          .upsert(updated);
+                                    }
+                                  }
+                                  if (value == 'delete') {
+                                    final confirm = await _confirmDelete(context);
+                                    if (confirm) {
+                                      await ref
+                                          .read(paymentRepositoryProvider)
+                                          .deleteById(payment.id);
+                                    }
+                                  }
+                                },
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  PopupMenuItem(value: 'delete', child: Text('Delete')),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                 ),
             ],
           ),

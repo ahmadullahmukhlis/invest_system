@@ -88,109 +88,111 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
                   icon: Icons.storefront_outlined,
                 )
               else
-                Card(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final supplier = filtered[index];
-                      final supplierPurchases = purchases
-                          .where((purchase) =>
-                              purchase.supplierId == supplier.id)
-                          .fold(0.0, (sum, item) => sum + item.totalPrice);
-                      final supplierPayments = payments
-                          .where((payment) =>
-                              payment.supplierId == supplier.id)
-                          .fold(0.0, (sum, item) => sum + item.amount);
-                      final balance = supplierPurchases - supplierPayments;
-
-                      return ListTile(
-                        title: Text(supplier.name),
-                        subtitle: Text(
-                          '${supplier.phone} • ${supplier.province}, ${supplier.district}',
-                        ),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) async {
-                            if (value == 'details') {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => SupplierLedgerScreen(
-                                    supplier: supplier,
+                Column(
+                  children: [
+                    for (final supplier in filtered) ...[
+                      Builder(
+                        builder: (context) {
+                          final supplierPurchases = purchases
+                              .where((purchase) =>
+                                  purchase.supplierId == supplier.id)
+                              .fold(0.0, (sum, item) => sum + item.totalPrice);
+                          final supplierPayments = payments
+                              .where((payment) =>
+                                  payment.supplierId == supplier.id)
+                              .fold(0.0, (sum, item) => sum + item.amount);
+                          final balance =
+                              supplierPurchases - supplierPayments;
+                          return Card(
+                            child: ListTile(
+                              title: Text(supplier.name),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${supplier.phone} • ${supplier.province}, ${supplier.district}',
                                   ),
-                                ),
-                              );
-                              return;
-                            }
-                            final canEdit = await ref
-                                .read(supplierRepositoryProvider)
-                                .canEdit(supplier.id);
-                            if (!canEdit) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'You can only edit your own records.'),
+                                  Text(
+                                    'Balance: ${formatMoney(balance)}',
+                                  ),
+                                ],
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) async {
+                                  if (value == 'details') {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => SupplierLedgerScreen(
+                                          supplier: supplier,
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  final canEdit = await ref
+                                      .read(supplierRepositoryProvider)
+                                      .canEdit(supplier.id);
+                                  if (!canEdit) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'You can only edit your own records.'),
+                                        ),
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  if (value == 'edit') {
+                                    final updated = await showDialog<Supplier>(
+                                      context: context,
+                                      builder: (context) => SupplierFormDialog(
+                                        existing: supplier,
+                                      ),
+                                    );
+                                    if (updated != null) {
+                                      await ref
+                                          .read(supplierRepositoryProvider)
+                                          .upsert(updated);
+                                    }
+                                  }
+                                  if (value == 'delete') {
+                                    final confirm = await _confirmDelete(context);
+                                    if (confirm) {
+                                      await ref
+                                          .read(supplierRepositoryProvider)
+                                          .deleteById(supplier.id);
+                                    }
+                                  }
+                                },
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(
+                                    value: 'details',
+                                    child: Text('Details'),
+                                  ),
+                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => SupplierLedgerScreen(
+                                      supplier: supplier,
+                                    ),
                                   ),
                                 );
-                              }
-                              return;
-                            }
-                            if (value == 'edit') {
-                              final updated = await showDialog<Supplier>(
-                                context: context,
-                                builder: (context) => SupplierFormDialog(
-                                  existing: supplier,
-                                ),
-                              );
-                              if (updated != null) {
-                                await ref
-                                    .read(supplierRepositoryProvider)
-                                    .upsert(updated);
-                              }
-                            }
-                            if (value == 'delete') {
-                              final confirm = await _confirmDelete(context);
-                              if (confirm) {
-                                await ref
-                                    .read(supplierRepositoryProvider)
-                                    .deleteById(supplier.id);
-                              }
-                            }
-                          },
-                          itemBuilder: (_) => [
-                            PopupMenuItem(
-                              enabled: false,
-                              child: Text('Balance: ${formatMoney(balance)}'),
-                            ),
-                            const PopupMenuDivider(),
-                            const PopupMenuItem(
-                              value: 'details',
-                              child: Text('Details'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: Text('Edit'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Text('Delete'),
-                            ),
-                          ],
-                        ),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => SupplierLedgerScreen(
-                                supplier: supplier,
-                              ),
+                              },
                             ),
                           );
                         },
-                      );
-                    },
-                  ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                 ),
             ],
           ),

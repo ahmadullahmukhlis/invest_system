@@ -70,102 +70,114 @@ class SalesScreen extends ConsumerWidget {
                   icon: Icons.receipt_long_outlined,
                 )
               else
-                Card(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: sales.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final sale = sales[index];
-                      final customerName = customers.isEmpty
-                          ? 'Unknown'
-                          : customers
-                              .firstWhere(
-                                (item) => item.id == sale.customerId,
-                                orElse: () => customers.first,
-                              )
-                              .name;
-                      final unitName = units.isEmpty
-                          ? ''
-                          : units
-                              .firstWhere(
-                                (item) => item.id == sale.unitId,
-                                orElse: () => units.first,
-                              )
-                              .name;
-                      return ListTile(
-                        title: Text(customerName),
-                        subtitle: Text(
-                          '${formatDate(sale.date)} • ${sale.quantityValue} $unitName @ ${formatMoney(sale.pricePerUnit)}',
-                        ),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) async {
-                            if (value == 'details') {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => SaleDetailScreen(sale: sale),
-                                ),
-                              );
-                              return;
-                            }
-                            if (value == 'receipt') {
-                              await _showReceipt(
-                                  context, sale, customerName, unitName);
-                              return;
-                            }
-                            final canEdit = await ref
-                                .read(saleRepositoryProvider)
-                                .canEdit(sale.id);
-                            if (!canEdit) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'You can only edit your own records.'),
+                Column(
+                  children: [
+                    for (final sale in sales) ...[
+                      Builder(
+                        builder: (context) {
+                          final customerName = customers.isEmpty
+                              ? 'Unknown'
+                              : customers
+                                  .firstWhere(
+                                    (item) => item.id == sale.customerId,
+                                    orElse: () => customers.first,
+                                  )
+                                  .name;
+                          final unitName = units.isEmpty
+                              ? ''
+                              : units
+                                  .firstWhere(
+                                    (item) => item.id == sale.unitId,
+                                    orElse: () => units.first,
+                                  )
+                                  .name;
+                          return Card(
+                            child: ListTile(
+                              title: Text(customerName),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${formatDate(sale.date)} • ${sale.quantityValue} $unitName @ ${formatMoney(sale.pricePerUnit)}',
                                   ),
-                                );
-                              }
-                              return;
-                            }
-                            if (value == 'edit') {
-                              final updated = await showDialog<Sale>(
-                                context: context,
-                                builder: (_) => _SaleFormDialog(
-                                  customers: customers,
-                                  units: units
-                                      .where((unit) => unit.isActive)
-                                      .toList(),
-                                  existing: sale,
-                                ),
-                              );
-                              if (updated != null) {
-                                await ref
-                                    .read(saleRepositoryProvider)
-                                    .upsert(updated);
-                              }
-                            }
-                            if (value == 'delete') {
-                              final confirm = await _confirmDelete(context);
-                              if (confirm) {
-                                await ref
-                                    .read(saleRepositoryProvider)
-                                    .deleteById(sale.id);
-                              }
-                            }
-                          },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(
-                                value: 'details', child: Text('Details')),
-                            PopupMenuItem(
-                                value: 'receipt', child: Text('Receipt')),
-                            PopupMenuItem(value: 'edit', child: Text('Edit')),
-                            PopupMenuItem(value: 'delete', child: Text('Delete')),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                                  Text('Total: ${formatMoney(sale.totalPrice)}'),
+                                ],
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) async {
+                                  if (value == 'details') {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => SaleDetailScreen(
+                                          sale: sale,
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  if (value == 'receipt') {
+                                    await _showReceipt(
+                                        context, sale, customerName, unitName);
+                                    return;
+                                  }
+                                  final canEdit = await ref
+                                      .read(saleRepositoryProvider)
+                                      .canEdit(sale.id);
+                                  if (!canEdit) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'You can only edit your own records.'),
+                                        ),
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  if (value == 'edit') {
+                                    final updated = await showDialog<Sale>(
+                                      context: context,
+                                      builder: (_) => _SaleFormDialog(
+                                        customers: customers,
+                                        units: units
+                                            .where((unit) => unit.isActive)
+                                            .toList(),
+                                        existing: sale,
+                                      ),
+                                    );
+                                    if (updated != null) {
+                                      await ref
+                                          .read(saleRepositoryProvider)
+                                          .upsert(updated);
+                                    }
+                                  }
+                                  if (value == 'delete') {
+                                    final confirm =
+                                        await _confirmDelete(context);
+                                    if (confirm) {
+                                      await ref
+                                          .read(saleRepositoryProvider)
+                                          .deleteById(sale.id);
+                                    }
+                                  }
+                                },
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(
+                                      value: 'details', child: Text('Details')),
+                                  PopupMenuItem(
+                                      value: 'receipt', child: Text('Receipt')),
+                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  PopupMenuItem(
+                                      value: 'delete', child: Text('Delete')),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                 ),
             ],
           ),

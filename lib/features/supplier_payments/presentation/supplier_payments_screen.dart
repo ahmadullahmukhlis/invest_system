@@ -72,74 +72,79 @@ class SupplierPaymentsScreen extends ConsumerWidget {
                   icon: Icons.account_balance_wallet_outlined,
                 )
               else
-                Card(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: payments.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final payment = payments[index];
-                      final supplierName = suppliers.isEmpty
-                          ? 'Unknown'
-                          : suppliers
-                              .firstWhere(
-                                (item) => item.id == payment.supplierId,
-                                orElse: () => suppliers.first,
-                              )
-                              .name;
-                      return ListTile(
-                        title: Text(supplierName),
-                        subtitle: Text(formatDate(payment.date)),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) async {
-                            final canEdit = await ref
-                                .read(supplierPaymentRepositoryProvider)
-                                .canEdit(payment.id);
-                            if (!canEdit) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'You can only edit your own records.'),
-                                  ),
-                                );
-                              }
-                              return;
-                            }
-                            if (value == 'edit') {
-                              final updated = await showDialog<SupplierPayment>(
-                                context: context,
-                                builder: (_) => _SupplierPaymentFormDialog(
-                                  suppliers: suppliers,
-                                  purchases: purchases,
-                                  payments: payments,
-                                  existing: payment,
-                                ),
-                              );
-                              if (updated != null) {
-                                await ref
-                                    .read(supplierPaymentRepositoryProvider)
-                                    .upsert(updated);
-                              }
-                            }
-                            if (value == 'delete') {
-                              final confirm = await _confirmDelete(context);
-                              if (confirm) {
-                                await ref
-                                    .read(supplierPaymentRepositoryProvider)
-                                    .deleteById(payment.id);
-                              }
-                            }
-                          },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(value: 'edit', child: Text('Edit')),
-                            PopupMenuItem(value: 'delete', child: Text('Delete')),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                Column(
+                  children: [
+                    for (final payment in payments) ...[
+                      Builder(
+                        builder: (context) {
+                          final supplierName = suppliers.isEmpty
+                              ? 'Unknown'
+                              : suppliers
+                                  .firstWhere(
+                                    (item) => item.id == payment.supplierId,
+                                    orElse: () => suppliers.first,
+                                  )
+                                  .name;
+                          return Card(
+                            child: ListTile(
+                              title: Text(supplierName),
+                              subtitle: Text(
+                                '${formatDate(payment.date)} • ${formatMoney(payment.amount)}',
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) async {
+                                  final canEdit = await ref
+                                      .read(supplierPaymentRepositoryProvider)
+                                      .canEdit(payment.id);
+                                  if (!canEdit) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'You can only edit your own records.'),
+                                        ),
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  if (value == 'edit') {
+                                    final updated =
+                                        await showDialog<SupplierPayment>(
+                                      context: context,
+                                      builder: (_) => _SupplierPaymentFormDialog(
+                                        suppliers: suppliers,
+                                        purchases: purchases,
+                                        payments: payments,
+                                        existing: payment,
+                                      ),
+                                    );
+                                    if (updated != null) {
+                                      await ref
+                                          .read(supplierPaymentRepositoryProvider)
+                                          .upsert(updated);
+                                    }
+                                  }
+                                  if (value == 'delete') {
+                                    final confirm = await _confirmDelete(context);
+                                    if (confirm) {
+                                      await ref
+                                          .read(supplierPaymentRepositoryProvider)
+                                          .deleteById(payment.id);
+                                    }
+                                  }
+                                },
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  PopupMenuItem(value: 'delete', child: Text('Delete')),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                 ),
             ],
           ),

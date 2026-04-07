@@ -70,107 +70,118 @@ class PurchasesScreen extends ConsumerWidget {
                   icon: Icons.shopping_cart_outlined,
                 )
               else
-                Card(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: purchases.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final purchase = purchases[index];
-                      final supplierName = suppliers.isEmpty
-                          ? 'Unknown'
-                          : suppliers
-                              .firstWhere(
-                                (item) => item.id == purchase.supplierId,
-                                orElse: () => suppliers.first,
-                              )
-                              .name;
-                      final unitName = units.isEmpty
-                          ? ''
-                          : units
-                              .firstWhere(
-                                (item) => item.id == purchase.unitId,
-                                orElse: () => units.first,
-                              )
-                              .name;
-                      return ListTile(
-                        title: Text(supplierName),
-                        subtitle: Text(
-                          '${formatDate(purchase.date)} • ${purchase.quantityValue} $unitName @ ${formatMoney(purchase.pricePerUnit)}',
-                        ),
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) async {
-                            if (value == 'details') {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => PurchaseDetailScreen(
-                                    purchase: purchase,
+                Column(
+                  children: [
+                    for (final purchase in purchases) ...[
+                      Builder(
+                        builder: (context) {
+                          final supplierName = suppliers.isEmpty
+                              ? 'Unknown'
+                              : suppliers
+                                  .firstWhere(
+                                    (item) => item.id == purchase.supplierId,
+                                    orElse: () => suppliers.first,
+                                  )
+                                  .name;
+                          final unitName = units.isEmpty
+                              ? ''
+                              : units
+                                  .firstWhere(
+                                    (item) => item.id == purchase.unitId,
+                                    orElse: () => units.first,
+                                  )
+                                  .name;
+                          return Card(
+                            child: ListTile(
+                              title: Text(supplierName),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${formatDate(purchase.date)} • ${purchase.quantityValue} $unitName @ ${formatMoney(purchase.pricePerUnit)}',
                                   ),
-                                ),
-                              );
-                              return;
-                            }
-                            if (value == 'receipt') {
-                              await _showReceipt(
-                                context,
-                                purchase,
-                                supplierName,
-                                unitName,
-                              );
-                              return;
-                            }
-                            final canEdit = await ref
-                                .read(purchaseRepositoryProvider)
-                                .canEdit(purchase.id);
-                            if (!canEdit) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'You can only edit your own records.'),
-                                  ),
-                                );
-                              }
-                              return;
-                            }
-                            if (value == 'edit') {
-                              final updated = await showDialog<Purchase>(
-                                context: context,
-                                builder: (_) => _PurchaseFormDialog(
-                                  suppliers: suppliers,
-                                  units:
-                                      units.where((unit) => unit.isActive).toList(),
-                                  existing: purchase,
-                                ),
-                              );
-                              if (updated != null) {
-                                await ref
-                                    .read(purchaseRepositoryProvider)
-                                    .upsert(updated);
-                              }
-                            }
-                            if (value == 'delete') {
-                              final confirm = await _confirmDelete(context);
-                              if (confirm) {
-                                await ref
-                                    .read(purchaseRepositoryProvider)
-                                    .deleteById(purchase.id);
-                              }
-                            }
-                          },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(
-                                value: 'details', child: Text('Details')),
-                            PopupMenuItem(
-                                value: 'receipt', child: Text('Receipt')),
-                            PopupMenuItem(value: 'edit', child: Text('Edit')),
-                            PopupMenuItem(value: 'delete', child: Text('Delete')),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                                  Text(
+                                      'Total: ${formatMoney(purchase.totalPrice)}'),
+                                ],
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) async {
+                                  if (value == 'details') {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => PurchaseDetailScreen(
+                                          purchase: purchase,
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  if (value == 'receipt') {
+                                    await _showReceipt(
+                                      context,
+                                      purchase,
+                                      supplierName,
+                                      unitName,
+                                    );
+                                    return;
+                                  }
+                                  final canEdit = await ref
+                                      .read(purchaseRepositoryProvider)
+                                      .canEdit(purchase.id);
+                                  if (!canEdit) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'You can only edit your own records.'),
+                                        ),
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  if (value == 'edit') {
+                                    final updated = await showDialog<Purchase>(
+                                      context: context,
+                                      builder: (_) => _PurchaseFormDialog(
+                                        suppliers: suppliers,
+                                        units: units
+                                            .where((unit) => unit.isActive)
+                                            .toList(),
+                                        existing: purchase,
+                                      ),
+                                    );
+                                    if (updated != null) {
+                                      await ref
+                                          .read(purchaseRepositoryProvider)
+                                          .upsert(updated);
+                                    }
+                                  }
+                                  if (value == 'delete') {
+                                    final confirm = await _confirmDelete(context);
+                                    if (confirm) {
+                                      await ref
+                                          .read(purchaseRepositoryProvider)
+                                          .deleteById(purchase.id);
+                                    }
+                                  }
+                                },
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(
+                                      value: 'details', child: Text('Details')),
+                                  PopupMenuItem(
+                                      value: 'receipt', child: Text('Receipt')),
+                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  PopupMenuItem(
+                                      value: 'delete', child: Text('Delete')),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                 ),
             ],
           ),
