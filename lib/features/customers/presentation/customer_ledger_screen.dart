@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
 import '../../payments/data/payment_providers.dart';
 import '../../sales/data/sale_providers.dart';
@@ -68,6 +69,12 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Ledger • ${widget.customer.name}'),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         actions: [
           TextButton.icon(
             onPressed: () async {
@@ -90,6 +97,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
             ),
         ],
       ),
+      drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Card(

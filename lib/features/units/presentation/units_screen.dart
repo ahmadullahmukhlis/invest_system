@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/app_drawer.dart';
 import '../data/unit_providers.dart';
 import '../domain/unit.dart';
 
@@ -15,6 +16,12 @@ class UnitsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Units Settings'),
         actions: [
+          Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu_open),
+              onPressed: () => Scaffold.of(context).openEndDrawer(),
+            ),
+          ),
           IconButton(
             onPressed: () async {
               final created = await showDialog<Unit>(
@@ -29,6 +36,7 @@ class UnitsScreen extends ConsumerWidget {
           ),
         ],
       ),
+      endDrawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Card(

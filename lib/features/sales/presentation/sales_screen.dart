@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../customers/domain/customer.dart';
@@ -21,6 +22,12 @@ class SalesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sales'),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         actions: [
           IconButton(
             onPressed: () async {
@@ -40,6 +47,7 @@ class SalesScreen extends ConsumerWidget {
           ),
         ],
       ),
+      drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Card(

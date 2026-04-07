@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../customers/domain/customer.dart';
@@ -22,6 +23,12 @@ class PaymentsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Payments Received'),
         actions: [
+          Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu_open),
+              onPressed: () => Scaffold.of(context).openEndDrawer(),
+            ),
+          ),
           IconButton(
             onPressed: () async {
               final created = await showDialog<Payment>(
@@ -41,6 +48,7 @@ class PaymentsScreen extends ConsumerWidget {
           ),
         ],
       ),
+      endDrawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Card(
