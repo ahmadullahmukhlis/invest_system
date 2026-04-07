@@ -6,6 +6,8 @@ import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
+import '../../../core/widgets/info_row.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../payments/data/payment_providers.dart';
 import '../../payments/data/payment_repository.dart';
@@ -144,33 +146,72 @@ class SaleDetailScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Customer: $customerName'),
+                  Text('Customer Info',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  InfoRow(label: 'Customer', value: customerName),
                   if (customer != null) ...[
-                    Text('Phone: ${customer.phone}'),
-                    Text(
-                        'Location: ${customer.province}, ${customer.district}'),
+                    InfoRow(label: 'Phone', value: customer.phone),
+                    InfoRow(
+                      label: 'Location',
+                      value:
+                          '${customer.province}, ${customer.district}',
+                    ),
                     if (customer.address != null &&
                         customer.address!.isNotEmpty)
-                      Text('Address: ${customer.address}'),
+                      InfoRow(label: 'Address', value: customer.address!),
                   ],
-                  const Divider(),
-                  Text('Customer Total Sales: ${formatMoney(customerSalesTotal)}'),
-                  Text(
-                      'Customer Total Payments: ${formatMoney(customerPaymentsTotal)}'),
-                  Text('Customer Remaining Balance: ${formatMoney(customerBalance)}'),
-                  const Divider(),
-                  Text('Date: ${formatDate(sale.date)}'),
-                  Text('Quantity: ${sale.quantityValue} $unitName'),
-                  Text('Price per unit: ${formatMoney(sale.pricePerUnit)}'),
-                  Text('Total: ${formatMoney(sale.totalPrice)}'),
-                  Text('Paid: ${formatMoney(paid)}'),
-                  Text('Balance: ${formatMoney(balance)}'),
-                  Text('Payments: ${related.length}'),
+                  const Divider(height: 24),
+                  Text('Customer Summary',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  InfoRow(
+                    label: 'Total Sales',
+                    value: formatMoney(customerSalesTotal),
+                  ),
+                  InfoRow(
+                    label: 'Total Payments',
+                    value: formatMoney(customerPaymentsTotal),
+                  ),
+                  InfoRow(
+                    label: 'Remaining Balance',
+                    value: formatMoney(customerBalance),
+                    highlight: true,
+                  ),
+                  const Divider(height: 24),
+                  Text('Sale Details',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  InfoRow(label: 'Date', value: formatDate(sale.date)),
+                  InfoRow(
+                      label: 'Quantity',
+                      value: '${sale.quantityValue} $unitName'),
+                  InfoRow(
+                    label: 'Price per unit',
+                    value: formatMoney(sale.pricePerUnit),
+                  ),
+                  InfoRow(label: 'Total', value: formatMoney(sale.totalPrice)),
+                  InfoRow(label: 'Paid', value: formatMoney(paid)),
+                  InfoRow(
+                    label: 'Balance',
+                    value: formatMoney(balance),
+                    highlight: true,
+                  ),
+                  InfoRow(
+                    label: 'Payments Count',
+                    value: related.length.toString(),
+                  ),
                   if (lastPaymentDate != null)
-                    Text('Last Payment: ${formatDate(lastPaymentDate)}'),
+                    InfoRow(
+                      label: 'Last Payment',
+                      value: formatDate(lastPaymentDate),
+                    ),
                   if (sale.note != null && sale.note!.isNotEmpty) ...[
-                    const Divider(),
-                    Text('Note: ${sale.note}'),
+                    const Divider(height: 24),
+                    Text('Note',
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    Text(sale.note!),
                   ],
                 ],
               ),
@@ -189,20 +230,30 @@ class SaleDetailScreen extends ConsumerWidget {
               icon: Icons.payments_outlined,
             )
           else
-            Card(
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: related.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final payment = related[index];
-                  return ListTile(
-                    title: Text(formatMoney(payment.amount)),
-                    subtitle: Text(formatDate(payment.date)),
-                  );
-                },
-              ),
+            Column(
+              children: [
+                for (final payment in related) ...[
+                  Card(
+                    child: ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.payments_outlined,
+                          color: AppColors.success,
+                          size: 18,
+                        ),
+                      ),
+                      title: Text(formatMoney(payment.amount)),
+                      subtitle: Text(formatDate(payment.date)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ],
             ),
           ],
         ),

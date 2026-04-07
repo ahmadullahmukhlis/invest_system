@@ -6,6 +6,8 @@ import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
+import '../../../core/widgets/info_row.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../supplier_payments/data/supplier_payment_providers.dart';
 import '../../supplier_payments/data/supplier_payment_repository.dart';
 import '../../supplier_payments/domain/supplier_payment.dart';
@@ -135,28 +137,62 @@ class PurchaseDetailScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Supplier: $supplierName'),
+                  Text('Supplier Info',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  InfoRow(label: 'Supplier', value: supplierName),
                   if (supplier != null) ...[
-                    Text('Phone: ${supplier.phone}'),
-                    Text(
-                        'Location: ${supplier.province}, ${supplier.district}'),
+                    InfoRow(label: 'Phone', value: supplier.phone),
+                    InfoRow(
+                      label: 'Location',
+                      value:
+                          '${supplier.province}, ${supplier.district}',
+                    ),
                     if (supplier.address != null &&
                         supplier.address!.isNotEmpty)
-                      Text('Address: ${supplier.address}'),
+                      InfoRow(label: 'Address', value: supplier.address!),
                   ],
-                  Text('Date: ${formatDate(purchase.date)}'),
-                  const Divider(),
-                  Text('Quantity: ${purchase.quantityValue} $unitName'),
-                  Text('Price per unit: ${formatMoney(purchase.pricePerUnit)}'),
-                  Text('Total: ${formatMoney(purchase.totalPrice)}'),
-                  Text('Paid: ${formatMoney(paid)}'),
-                  Text('Balance: ${formatMoney(balance)}'),
-                  Text('Payments: ${related.length}'),
+                  const Divider(height: 24),
+                  Text('Purchase Details',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  InfoRow(label: 'Date', value: formatDate(purchase.date)),
+                  InfoRow(
+                    label: 'Quantity',
+                    value: '${purchase.quantityValue} $unitName',
+                  ),
+                  InfoRow(
+                    label: 'Price per unit',
+                    value: formatMoney(purchase.pricePerUnit),
+                  ),
+                  InfoRow(
+                    label: 'Total',
+                    value: formatMoney(purchase.totalPrice),
+                  ),
+                  InfoRow(
+                    label: 'Paid',
+                    value: formatMoney(paid),
+                  ),
+                  InfoRow(
+                    label: 'Balance',
+                    value: formatMoney(balance),
+                    highlight: true,
+                  ),
+                  InfoRow(
+                    label: 'Payments Count',
+                    value: related.length.toString(),
+                  ),
                   if (lastPaymentDate != null)
-                    Text('Last Payment: ${formatDate(lastPaymentDate)}'),
+                    InfoRow(
+                      label: 'Last Payment',
+                      value: formatDate(lastPaymentDate),
+                    ),
                   if (purchase.note != null && purchase.note!.isNotEmpty) ...[
-                    const Divider(),
-                    Text('Note: ${purchase.note}'),
+                    const Divider(height: 24),
+                    Text('Note',
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    Text(purchase.note!),
                   ],
                 ],
               ),
@@ -175,20 +211,30 @@ class PurchaseDetailScreen extends ConsumerWidget {
               icon: Icons.payments_outlined,
             )
           else
-            Card(
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: related.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final payment = related[index];
-                  return ListTile(
-                    title: Text(formatMoney(payment.amount)),
-                    subtitle: Text(formatDate(payment.date)),
-                  );
-                },
-              ),
+            Column(
+              children: [
+                for (final payment in related) ...[
+                  Card(
+                    child: ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.payments_outlined,
+                          color: AppColors.success,
+                          size: 18,
+                        ),
+                      ),
+                      title: Text(formatMoney(payment.amount)),
+                      subtitle: Text(formatDate(payment.date)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ],
             ),
           ],
         ),

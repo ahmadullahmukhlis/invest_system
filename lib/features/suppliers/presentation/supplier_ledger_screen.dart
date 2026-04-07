@@ -6,6 +6,8 @@ import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
+import '../../../core/widgets/info_row.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../purchases/data/purchase_providers.dart';
 import '../../purchases/domain/purchase.dart';
 import '../../supplier_payments/data/supplier_payment_providers.dart';
@@ -219,21 +221,44 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
                     Text('Supplier Info',
                         style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
-                    Text('Name: ${widget.supplier.name}'),
-                    Text('Phone: ${widget.supplier.phone}'),
-                    Text(
-                        'Location: ${widget.supplier.province}, ${widget.supplier.district}'),
+                    InfoRow(label: 'Name', value: widget.supplier.name),
+                    InfoRow(label: 'Phone', value: widget.supplier.phone),
+                    InfoRow(
+                      label: 'Location',
+                      value:
+                          '${widget.supplier.province}, ${widget.supplier.district}',
+                    ),
                     if (widget.supplier.address != null &&
                         widget.supplier.address!.isNotEmpty)
-                      Text('Address: ${widget.supplier.address}'),
-                    const Divider(),
-                    Text('Total Purchases: ${formatMoney(totalPurchases)}'),
-                    Text('Total Payments: ${formatMoney(totalPayments)}'),
-                    Text('Balance: ${formatMoney(balance)}'),
+                      InfoRow(
+                        label: 'Address',
+                        value: widget.supplier.address!,
+                      ),
+                    const Divider(height: 24),
+                    Text('Account Summary',
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    InfoRow(
+                        label: 'Total Purchases',
+                        value: formatMoney(totalPurchases)),
+                    InfoRow(
+                        label: 'Total Payments',
+                        value: formatMoney(totalPayments)),
+                    InfoRow(
+                      label: 'Remaining Balance',
+                      value: formatMoney(balance),
+                      highlight: true,
+                    ),
                     if (lastPurchaseDate != null)
-                      Text('Last Purchase: ${formatDate(lastPurchaseDate)}'),
+                      InfoRow(
+                        label: 'Last Purchase',
+                        value: formatDate(lastPurchaseDate),
+                      ),
                     if (lastPaymentDate != null)
-                      Text('Last Payment: ${formatDate(lastPaymentDate)}'),
+                      InfoRow(
+                        label: 'Last Payment',
+                        value: formatDate(lastPaymentDate),
+                      ),
                   ],
                 ),
               ),
@@ -251,33 +276,56 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
                 icon: Icons.receipt_long_outlined,
               )
             else
-              Card(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: rows.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final entry = rows[index];
-                    return ListTile(
-                      leading: Icon(
-                        entry.isDebit
-                            ? Icons.arrow_upward
-                            : Icons.arrow_downward,
+              Column(
+                children: [
+                  for (final entry in rows) ...[
+                    Card(
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: (entry.isDebit
+                                    ? AppColors.success
+                                    : AppColors.danger)
+                                .withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            entry.isDebit
+                                ? Icons.arrow_upward
+                                : Icons.arrow_downward,
+                            color: entry.isDebit
+                                ? AppColors.success
+                                : AppColors.danger,
+                            size: 18,
+                          ),
+                        ),
+                        title:
+                            Text('${entry.type} • ${formatDate(entry.date)}'),
+                        subtitle: Text(entry.note ?? 'No note'),
+                        trailing: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              formatMoney(entry.amount),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              'Balance: ${formatMoney(entry.runningBalance)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      title: Text('${entry.type} • ${formatDate(entry.date)}'),
-                      subtitle: Text(entry.note ?? 'No note'),
-                      trailing: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(formatMoney(entry.amount)),
-                          Text('Balance: ${formatMoney(entry.runningBalance)}'),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ],
               ),
             ],
           ),
