@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/refresh_wrapper.dart';
 import 'supplier_form_dialog.dart';
 import '../../purchases/data/purchase_providers.dart';
 import '../../supplier_payments/data/supplier_payment_providers.dart';
@@ -61,19 +62,22 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
       drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                hintText: 'Search by name, phone, province, district',
+        child: RefreshWrapper(
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              TextField(
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Search by name, phone, province, district',
+                ),
+                onChanged: (value) => setState(() => _query = value),
               ),
-              onChanged: (value) => setState(() => _query = value),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Card(
+              const SizedBox(height: 16),
+              Card(
                 child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: filtered.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, index) {
@@ -171,8 +175,8 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
                   },
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

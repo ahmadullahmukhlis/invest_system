@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/data/sync_providers.dart';
 import '../../../core/widgets/app_drawer.dart';
+import '../../../core/widgets/refresh_wrapper.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -21,9 +22,11 @@ class SettingsScreen extends ConsumerWidget {
         ),
       ),
       drawer: const AppDrawer(),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: RefreshWrapper(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -90,14 +93,15 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-            },
-            icon: const Icon(Icons.logout),
-            label: const Text('Sign Out'),
-          ),
-        ],
+            FilledButton.icon(
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text('Sign Out'),
+            ),
+          ],
+        ),
       ),
     );
   }

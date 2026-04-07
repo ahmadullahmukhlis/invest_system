@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/refresh_wrapper.dart';
 import '../../payments/data/payment_providers.dart';
 import 'customer_form_dialog.dart';
 import '../data/customer_providers.dart';
@@ -191,8 +192,10 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
       drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: ListView(
-          children: [
+        child: RefreshWrapper(
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -251,6 +254,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

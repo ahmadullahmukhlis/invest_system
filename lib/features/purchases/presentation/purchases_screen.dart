@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/refresh_wrapper.dart';
 import '../../suppliers/data/supplier_providers.dart';
 import '../../suppliers/domain/supplier.dart';
 import '../../units/data/unit_providers.dart';
@@ -51,34 +52,40 @@ class PurchasesScreen extends ConsumerWidget {
       drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Card(
-          child: ListView.separated(
-            itemCount: purchases.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final purchase = purchases[index];
-              final supplierName = suppliers.isEmpty
-                  ? 'Unknown'
-                  : suppliers
-                      .firstWhere(
-                        (item) => item.id == purchase.supplierId,
-                        orElse: () => suppliers.first,
-                      )
-                      .name;
-              final unitName = units.isEmpty
-                  ? ''
-                  : units
-                      .firstWhere(
-                        (item) => item.id == purchase.unitId,
-                        orElse: () => units.first,
-                      )
-                      .name;
-              return ListTile(
-                title: Text(supplierName),
-                subtitle: Text(
-                  '${formatDate(purchase.date)} • ${purchase.quantityValue} $unitName @ ${formatMoney(purchase.pricePerUnit)}',
-                ),
-                trailing: PopupMenuButton<String>(
+        child: RefreshWrapper(
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              Card(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: purchases.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final purchase = purchases[index];
+                    final supplierName = suppliers.isEmpty
+                        ? 'Unknown'
+                        : suppliers
+                            .firstWhere(
+                              (item) => item.id == purchase.supplierId,
+                              orElse: () => suppliers.first,
+                            )
+                            .name;
+                    final unitName = units.isEmpty
+                        ? ''
+                        : units
+                            .firstWhere(
+                              (item) => item.id == purchase.unitId,
+                              orElse: () => units.first,
+                            )
+                            .name;
+                    return ListTile(
+                      title: Text(supplierName),
+                      subtitle: Text(
+                        '${formatDate(purchase.date)} • ${purchase.quantityValue} $unitName @ ${formatMoney(purchase.pricePerUnit)}',
+                      ),
+                      trailing: PopupMenuButton<String>(
                   onSelected: (value) async {
                     if (value == 'details') {
                       Navigator.of(context).push(
@@ -143,9 +150,12 @@ class PurchasesScreen extends ConsumerWidget {
                     PopupMenuItem(value: 'edit', child: Text('Edit')),
                     PopupMenuItem(value: 'delete', child: Text('Delete')),
                   ],
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ),
       ),

@@ -5,6 +5,7 @@ import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/data/geo_providers.dart';
 import '../../../core/data/geo_data.dart';
+import '../../../core/widgets/refresh_wrapper.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../purchases/data/purchase_providers.dart';
 import '../../sales/data/sale_providers.dart';
@@ -95,9 +96,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         ),
       ),
       drawer: const AppDrawer(),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: RefreshWrapper(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -209,7 +212,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               ),
             ],
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

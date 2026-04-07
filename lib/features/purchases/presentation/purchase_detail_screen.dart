@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_drawer.dart';
+import '../../../core/widgets/refresh_wrapper.dart';
 import '../../supplier_payments/data/supplier_payment_providers.dart';
 import '../../supplier_payments/data/supplier_payment_repository.dart';
 import '../../supplier_payments/domain/supplier_payment.dart';
@@ -116,9 +117,11 @@ class PurchaseDetailScreen extends ConsumerWidget {
         ],
       ),
       drawer: const AppDrawer(),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: RefreshWrapper(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -178,7 +181,8 @@ class PurchaseDetailScreen extends ConsumerWidget {
                     },
                   ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

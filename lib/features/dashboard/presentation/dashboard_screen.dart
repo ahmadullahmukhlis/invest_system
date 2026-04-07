@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/refresh_wrapper.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../payments/data/payment_providers.dart';
 import '../../sales/data/sale_providers.dart';
@@ -52,9 +53,11 @@ class DashboardScreen extends ConsumerWidget {
         ),
       ),
       drawer: const AppDrawer(),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
+      body: RefreshWrapper(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          children: [
           Wrap(
             spacing: 16,
             runSpacing: 16,
@@ -117,7 +120,8 @@ class DashboardScreen extends ConsumerWidget {
             suppliers: suppliers,
             supplierPayments: recentSupplierPayments.take(5).toList(),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

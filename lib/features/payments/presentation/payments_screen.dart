@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/refresh_wrapper.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../customers/domain/customer.dart';
 import '../../sales/data/sale_providers.dart';
@@ -51,71 +52,80 @@ class PaymentsScreen extends ConsumerWidget {
       drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Card(
-          child: ListView.separated(
-            itemCount: payments.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final payment = payments[index];
-              final customerName = customers.isEmpty
-                  ? 'Unknown'
-                  : customers
-                      .firstWhere(
-                        (item) => item.id == payment.customerId,
-                        orElse: () => customers.first,
-                      )
-                      .name;
-              return ListTile(
-                title: Text(customerName),
-                subtitle: Text(formatDate(payment.date)),
-                trailing: PopupMenuButton<String>(
-                  onSelected: (value) async {
-                    final canEdit = await ref
-                        .read(paymentRepositoryProvider)
-                        .canEdit(payment.id);
-                    if (!canEdit) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content:
-                                Text('You can only edit your own records.'),
-                          ),
-                        );
-                      }
-                      return;
-                    }
-                    if (value == 'edit') {
-                      final updated = await showDialog<Payment>(
-                        context: context,
-                        builder: (_) => _PaymentFormDialog(
-                          customers: customers,
-                          sales: sales,
-                          payments: payments,
-                          existing: payment,
-                        ),
-                      );
-                      if (updated != null) {
-                        await ref
-                            .read(paymentRepositoryProvider)
-                            .upsert(updated);
-                      }
-                    }
-                    if (value == 'delete') {
-                      final confirm = await _confirmDelete(context);
-                      if (confirm) {
-                        await ref
-                            .read(paymentRepositoryProvider)
-                            .deleteById(payment.id);
-                      }
-                    }
+        child: RefreshWrapper(
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              Card(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: payments.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final payment = payments[index];
+                    final customerName = customers.isEmpty
+                        ? 'Unknown'
+                        : customers
+                            .firstWhere(
+                              (item) => item.id == payment.customerId,
+                              orElse: () => customers.first,
+                            )
+                            .name;
+                    return ListTile(
+                      title: Text(customerName),
+                      subtitle: Text(formatDate(payment.date)),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (value) async {
+                          final canEdit = await ref
+                              .read(paymentRepositoryProvider)
+                              .canEdit(payment.id);
+                          if (!canEdit) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'You can only edit your own records.'),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+                          if (value == 'edit') {
+                            final updated = await showDialog<Payment>(
+                              context: context,
+                              builder: (_) => _PaymentFormDialog(
+                                customers: customers,
+                                sales: sales,
+                                payments: payments,
+                                existing: payment,
+                              ),
+                            );
+                            if (updated != null) {
+                              await ref
+                                  .read(paymentRepositoryProvider)
+                                  .upsert(updated);
+                            }
+                          }
+                          if (value == 'delete') {
+                            final confirm = await _confirmDelete(context);
+                            if (confirm) {
+                              await ref
+                                  .read(paymentRepositoryProvider)
+                                  .deleteById(payment.id);
+                            }
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(value: 'edit', child: Text('Edit')),
+                          PopupMenuItem(value: 'delete', child: Text('Delete')),
+                        ],
+                      ),
+                    );
                   },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'edit', child: Text('Edit')),
-                    PopupMenuItem(value: 'delete', child: Text('Delete')),
-                  ],
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ),
       ),
