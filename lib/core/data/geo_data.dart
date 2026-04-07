@@ -13,7 +13,12 @@ class ProvinceData {
 }
 
 Future<List<ProvinceData>> loadProvinceData() async {
-  final raw = await rootBundle.loadString('assets/provinces-and-districts.json');
+  String raw;
+  try {
+    raw = await rootBundle.loadString('assets/provinces-and-districts.json');
+  } catch (_) {
+    return const [];
+  }
   final decoded = jsonDecode(raw);
   if (decoded is! List) return const [];
   final provinces = <ProvinceData>[];
