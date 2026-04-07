@@ -159,6 +159,9 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                 builder: (_) => _PaymentForCustomerDialog(
                   customerId: widget.customer.id,
                   sales: sales,
+                  totalSales: totalSales,
+                  totalPayments: totalPayments,
+                  remainingBalance: balance,
                 ),
               );
               if (created != null) {
@@ -215,7 +218,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                     const Divider(),
                     Text('Total Sales: ${formatMoney(totalSales)}'),
                     Text('Total Payments: ${formatMoney(totalPayments)}'),
-                    Text('Balance: ${formatMoney(balance)}'),
+                    Text('Remaining Balance: ${formatMoney(balance)}'),
                     if (lastSaleDate != null)
                       Text('Last Sale: ${formatDate(lastSaleDate)}'),
                     if (lastPaymentDate != null)
@@ -471,10 +474,16 @@ class _PaymentForCustomerDialog extends StatefulWidget {
   const _PaymentForCustomerDialog({
     required this.customerId,
     required this.sales,
+    required this.totalSales,
+    required this.totalPayments,
+    required this.remainingBalance,
   });
 
   final String customerId;
   final List<Sale> sales;
+  final double totalSales;
+  final double totalPayments;
+  final double remainingBalance;
 
   @override
   State<_PaymentForCustomerDialog> createState() =>
@@ -506,6 +515,22 @@ class _PaymentForCustomerDialogState extends State<_PaymentForCustomerDialog> {
           child: SingleChildScrollView(
             child: Column(
               children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Customer Total Sales'),
+                  trailing: Text(formatMoney(widget.totalSales)),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Customer Total Payments'),
+                  trailing: Text(formatMoney(widget.totalPayments)),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Customer Remaining Balance'),
+                  trailing: Text(formatMoney(widget.remainingBalance)),
+                ),
+                const Divider(height: 16),
                 DropdownButtonFormField<String>(
                   value: _saleId,
                   items: [

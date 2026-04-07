@@ -22,6 +22,7 @@ class SaleDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final customers = ref.watch(customersProvider);
     final units = ref.watch(unitsProvider);
+    final allSales = ref.watch(salesProvider);
     final payments = ref.watch(paymentsProvider)
       ..sort((a, b) => b.date.compareTo(a.date));
 
@@ -46,6 +47,13 @@ class SaleDetailScreen extends ConsumerWidget {
     final balance = sale.totalPrice - paid;
     final lastPaymentDate =
         related.isEmpty ? null : related.first.date;
+    final customerSalesTotal = allSales
+        .where((item) => item.customerId == sale.customerId)
+        .fold(0.0, (sum, item) => sum + item.totalPrice);
+    final customerPaymentsTotal = payments
+        .where((item) => item.customerId == sale.customerId)
+        .fold(0.0, (sum, item) => sum + item.amount);
+    final customerBalance = customerSalesTotal - customerPaymentsTotal;
 
     return Scaffold(
       appBar: AppBar(
@@ -86,6 +94,9 @@ class SaleDetailScreen extends ConsumerWidget {
                   customerId: sale.customerId,
                   sale: sale,
                   balance: balance,
+                  customerTotalSales: customerSalesTotal,
+                  customerTotalPayments: customerPaymentsTotal,
+                  customerRemaining: customerBalance,
                 ),
               );
               if (created != null) {
@@ -135,8 +146,13 @@ class SaleDetailScreen extends ConsumerWidget {
                         customer.address!.isNotEmpty)
                       Text('Address: ${customer.address}'),
                   ],
-                  Text('Date: ${formatDate(sale.date)}'),
                   const Divider(),
+                  Text('Customer Total Sales: ${formatMoney(customerSalesTotal)}'),
+                  Text(
+                      'Customer Total Payments: ${formatMoney(customerPaymentsTotal)}'),
+                  Text('Customer Remaining Balance: ${formatMoney(customerBalance)}'),
+                  const Divider(),
+                  Text('Date: ${formatDate(sale.date)}'),
                   Text('Quantity: ${sale.quantityValue} $unitName'),
                   Text('Price per unit: ${formatMoney(sale.pricePerUnit)}'),
                   Text('Total: ${formatMoney(sale.totalPrice)}'),
@@ -319,11 +335,17 @@ class _PaymentForSaleDialog extends StatefulWidget {
     required this.customerId,
     required this.sale,
     required this.balance,
+    required this.customerTotalSales,
+    required this.customerTotalPayments,
+    required this.customerRemaining,
   });
 
   final String customerId;
   final Sale sale;
   final double balance;
+  final double customerTotalSales;
+  final double customerTotalPayments;
+  final double customerRemaining;
 
   @override
   State<_PaymentForSaleDialog> createState() => _PaymentForSaleDialogState();
@@ -353,6 +375,22 @@ class _PaymentForSaleDialogState extends State<_PaymentForSaleDialog> {
           child: SingleChildScrollView(
             child: Column(
               children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Customer Total Sales'),
+                  trailing: Text(formatMoney(widget.customerTotalSales)),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Customer Total Payments'),
+                  trailing: Text(formatMoney(widget.customerTotalPayments)),
+                ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Customer Remaining Balance'),
+                  trailing: Text(formatMoney(widget.customerRemaining)),
+                ),
+                const Divider(height: 16),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Sale Total'),
