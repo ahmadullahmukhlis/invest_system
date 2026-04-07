@@ -7,14 +7,17 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../customers/domain/customer.dart';
+import '../../customers/presentation/customer_ledger_screen.dart';
 import '../../payments/data/payment_providers.dart';
 import '../../payments/domain/payment.dart';
 import '../../sales/data/sale_providers.dart';
 import '../../sales/domain/sale.dart';
 import '../../suppliers/data/supplier_providers.dart';
 import '../../suppliers/domain/supplier.dart';
+import '../../suppliers/presentation/supplier_ledger_screen.dart';
 import '../../supplier_payments/data/supplier_payment_providers.dart';
 import '../../supplier_payments/domain/supplier_payment.dart';
+import '../../sales/presentation/sale_detail_screen.dart';
 import 'dashboard_providers.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -201,6 +204,15 @@ class _TopCustomersCard extends StatelessWidget {
                 leading: const Icon(Icons.person_outline),
                 title: Text((item['customer'] as dynamic).name),
                 trailing: Text(formatMoney(item['total'] as double)),
+                onTap: () {
+                  final customer = item['customer'] as Customer;
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          CustomerLedgerScreen(customer: customer),
+                    ),
+                  );
+                },
               ),
           ],
         ),
@@ -236,6 +248,13 @@ class _RecentTransactionsCard extends StatelessWidget {
           .name;
     }
 
+    Customer? customerById(String id) {
+      for (final customer in customers) {
+        if (customer.id == id) return customer;
+      }
+      return null;
+    }
+
     String supplierName(String id) {
       if (suppliers.isEmpty) return 'Unknown';
       return suppliers
@@ -244,6 +263,13 @@ class _RecentTransactionsCard extends StatelessWidget {
             orElse: () => suppliers.first,
           )
           .name;
+    }
+
+    Supplier? supplierById(String id) {
+      for (final supplier in suppliers) {
+        if (supplier.id == id) return supplier;
+      }
+      return null;
     }
 
     return Card(
@@ -257,6 +283,13 @@ class _RecentTransactionsCard extends StatelessWidget {
                 title: Text('Sale • ${formatDate(sale.date)}'),
                 subtitle: Text(customerName(sale.customerId)),
                 trailing: Text(formatMoney(sale.totalPrice)),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SaleDetailScreen(sale: sale),
+                    ),
+                  );
+                },
               ),
             ),
             ...payments.map(
@@ -265,6 +298,21 @@ class _RecentTransactionsCard extends StatelessWidget {
                 title: Text('Payment • ${formatDate(payment.date)}'),
                 subtitle: Text(customerName(payment.customerId)),
                 trailing: Text(formatMoney(payment.amount)),
+                onTap: () {
+                  final customer = customerById(payment.customerId);
+                  if (customer == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Customer not found.')),
+                    );
+                    return;
+                  }
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          CustomerLedgerScreen(customer: customer),
+                    ),
+                  );
+                },
               ),
             ),
             ...supplierPayments.map(
@@ -273,6 +321,21 @@ class _RecentTransactionsCard extends StatelessWidget {
                 title: Text('Supplier Payment • ${formatDate(payment.date)}'),
                 subtitle: Text(supplierName(payment.supplierId)),
                 trailing: Text(formatMoney(payment.amount)),
+                onTap: () {
+                  final supplier = supplierById(payment.supplierId);
+                  if (supplier == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Supplier not found.')),
+                    );
+                    return;
+                  }
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          SupplierLedgerScreen(supplier: supplier),
+                    ),
+                  );
+                },
               ),
             ),
             if (sales.isEmpty && payments.isEmpty && supplierPayments.isEmpty)
