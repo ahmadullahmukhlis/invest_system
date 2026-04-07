@@ -15,13 +15,13 @@ class UnitsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Units Settings'),
-        actions: [
-          Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu_open),
-              onPressed: () => Scaffold.of(context).openEndDrawer(),
-            ),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
           ),
+        ),
+        actions: [
           IconButton(
             onPressed: () async {
               final created = await showDialog<Unit>(
@@ -36,7 +36,7 @@ class UnitsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      endDrawer: const AppDrawer(),
+      drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Card(
