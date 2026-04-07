@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
+import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/empty_state_card.dart';
 import '../data/unit_providers.dart';
 import '../domain/unit.dart';
 
@@ -44,59 +46,72 @@ class UnitsScreen extends ConsumerWidget {
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
-              Card(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: units.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final unit = units[index];
-                    return ListTile(
-                      title: Text(unit.name),
-                      subtitle: Text(unit.isActive ? 'Active' : 'Inactive'),
-                      trailing: PopupMenuButton<String>(
-                        onSelected: (value) async {
-                          if (value == 'toggle') {
-                            await ref
-                                .read(unitRepositoryProvider)
-                                .toggleActive(unit.id);
-                          }
-                          if (value == 'edit') {
-                            final updated = await showDialog<Unit>(
-                              context: context,
-                              builder: (_) => _UnitFormDialog(existing: unit),
-                            );
-                            if (updated != null) {
-                              await ref
-                                  .read(unitRepositoryProvider)
-                                  .upsert(updated);
-                            }
-                          }
-                          if (value == 'delete') {
-                            final confirm = await _confirmDelete(context);
-                            if (confirm) {
-                              await ref
-                                  .read(unitRepositoryProvider)
-                                  .deleteById(unit.id);
-                            }
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'toggle',
-                            child:
-                                Text(unit.isActive ? 'Deactivate' : 'Activate'),
-                          ),
-                          const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                          const PopupMenuItem(
-                              value: 'delete', child: Text('Delete')),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+              SectionHeader(
+                title: 'Units',
+                subtitle: '${units.length} records',
+                icon: Icons.straighten,
               ),
+              if (units.isEmpty)
+                const EmptyStateCard(
+                  title: 'No units yet',
+                  subtitle: 'Add units to use in sales and purchases.',
+                  icon: Icons.straighten_outlined,
+                )
+              else
+                Card(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: units.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final unit = units[index];
+                      return ListTile(
+                        title: Text(unit.name),
+                        subtitle: Text(unit.isActive ? 'Active' : 'Inactive'),
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (value) async {
+                            if (value == 'toggle') {
+                              await ref
+                                  .read(unitRepositoryProvider)
+                                  .toggleActive(unit.id);
+                            }
+                            if (value == 'edit') {
+                              final updated = await showDialog<Unit>(
+                                context: context,
+                                builder: (_) => _UnitFormDialog(existing: unit),
+                              );
+                              if (updated != null) {
+                                await ref
+                                    .read(unitRepositoryProvider)
+                                    .upsert(updated);
+                              }
+                            }
+                            if (value == 'delete') {
+                              final confirm = await _confirmDelete(context);
+                              if (confirm) {
+                                await ref
+                                    .read(unitRepositoryProvider)
+                                    .deleteById(unit.id);
+                              }
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
+                              value: 'toggle',
+                              child: Text(
+                                  unit.isActive ? 'Deactivate' : 'Activate'),
+                            ),
+                            const PopupMenuItem(
+                                value: 'edit', child: Text('Edit')),
+                            const PopupMenuItem(
+                                value: 'delete', child: Text('Delete')),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
             ],
           ),
         ),

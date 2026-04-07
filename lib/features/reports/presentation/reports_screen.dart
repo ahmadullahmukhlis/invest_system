@@ -6,6 +6,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/data/geo_providers.dart';
 import '../../../core/data/geo_data.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
+import '../../../core/widgets/section_header.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../purchases/data/purchase_providers.dart';
 import '../../sales/data/sale_providers.dart';
@@ -101,6 +102,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           children: [
+          const SectionHeader(
+            title: 'Filters',
+            subtitle: 'Narrow down sales and purchases',
+            icon: Icons.tune,
+          ),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -112,6 +118,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     width: 240,
                     child: DropdownButtonFormField<String>(
                       value: _province,
+                      isExpanded: true,
                       items: [
                         for (final item in provinces)
                           DropdownMenuItem(value: item, child: Text(item)),
@@ -129,6 +136,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     width: 240,
                     child: DropdownButtonFormField<String>(
                       value: _district,
+                      isExpanded: true,
                       items: [
                         for (final item in districts)
                           DropdownMenuItem(value: item, child: Text(item)),
@@ -143,6 +151,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     width: 220,
                     child: DropdownButtonFormField<String>(
                       value: _unitId,
+                      isExpanded: true,
                       items: [
                         for (final unit in units)
                           DropdownMenuItem(
@@ -186,6 +195,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          const SectionHeader(
+            title: 'Summary',
+            subtitle: 'Totals based on applied filters',
+            icon: Icons.analytics_outlined,
+          ),
           Wrap(
             spacing: 16,
             runSpacing: 16,

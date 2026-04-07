@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
+import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/empty_state_card.dart';
 import '../../payments/data/payment_providers.dart';
 import 'customer_form_dialog.dart';
 import '../data/customer_providers.dart';
@@ -199,6 +201,11 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
+            const SectionHeader(
+              title: 'Customer Overview',
+              subtitle: 'Summary and recent activity',
+              icon: Icons.person_outline,
+            ),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -228,36 +235,48 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Card(
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: rows.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final entry = rows[index];
-                  return ListTile(
-                    leading: Icon(
-                      entry.isCredit
-                          ? Icons.arrow_upward
-                          : Icons.arrow_downward,
-                    ),
-                    title: Text('${entry.type} • ${formatDate(entry.date)}'),
-                    subtitle: Text(entry.note ?? 'No note'),
-                    trailing: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(formatMoney(entry.amount)),
-                        Text('Balance: ${formatMoney(entry.runningBalance)}'),
-                      ],
-                    ),
-                  );
-                },
-              ),
+            const SectionHeader(
+              title: 'Ledger',
+              subtitle: 'Sales and payments history',
+              icon: Icons.receipt_long_outlined,
             ),
-          ],
-        ),
+            if (rows.isEmpty)
+              const EmptyStateCard(
+                title: 'No transactions yet',
+                subtitle: 'Add a sale or payment to see it here.',
+                icon: Icons.receipt_long_outlined,
+              )
+            else
+              Card(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: rows.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final entry = rows[index];
+                    return ListTile(
+                      leading: Icon(
+                        entry.isCredit
+                            ? Icons.arrow_upward
+                            : Icons.arrow_downward,
+                      ),
+                      title: Text('${entry.type} • ${formatDate(entry.date)}'),
+                      subtitle: Text(entry.note ?? 'No note'),
+                      trailing: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(formatMoney(entry.amount)),
+                          Text('Balance: ${formatMoney(entry.runningBalance)}'),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

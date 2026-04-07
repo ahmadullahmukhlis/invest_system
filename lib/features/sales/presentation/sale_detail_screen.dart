@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
+import '../../../core/widgets/section_header.dart';
+import '../../../core/widgets/empty_state_card.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../payments/data/payment_providers.dart';
 import '../../payments/data/payment_repository.dart';
@@ -131,6 +133,11 @@ class SaleDetailScreen extends ConsumerWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           children: [
+          const SectionHeader(
+            title: 'Sale Overview',
+            subtitle: 'Customer and sale details',
+            icon: Icons.receipt_long_outlined,
+          ),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -170,31 +177,33 @@ class SaleDetailScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            'Payments',
-            style: Theme.of(context).textTheme.titleLarge,
+          const SectionHeader(
+            title: 'Payments',
+            subtitle: 'Payments received for this sale',
+            icon: Icons.payments_outlined,
           ),
-          const SizedBox(height: 8),
-          Card(
-            child: related.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('No payments yet.'),
-                  )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: related.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final payment = related[index];
-                      return ListTile(
-                        title: Text(formatMoney(payment.amount)),
-                        subtitle: Text(formatDate(payment.date)),
-                      );
-                    },
-                  ),
-          ),
+          if (related.isEmpty)
+            const EmptyStateCard(
+              title: 'No payments yet',
+              subtitle: 'Add a payment to close this sale.',
+              icon: Icons.payments_outlined,
+            )
+          else
+            Card(
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: related.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final payment = related[index];
+                  return ListTile(
+                    title: Text(formatMoney(payment.amount)),
+                    subtitle: Text(formatDate(payment.date)),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
