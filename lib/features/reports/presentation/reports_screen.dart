@@ -31,7 +31,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final sales = ref.watch(salesProvider);
     final purchases = ref.watch(purchasesProvider);
     final units = ref.watch(unitsProvider);
-    final provincesData = ref.watch(provinceDataProvider).value ?? const [];
+    final provinceAsync = ref.watch(provinceDataProvider);
+    final provincesData = provinceAsync.value ?? const [];
 
     final provinces = provincesData.map((p) => p.name).toList();
     final selectedProvince = provincesData.firstWhere(
@@ -113,10 +114,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                           DropdownMenuItem(value: item, child: Text(item)),
                       ],
                       decoration: const InputDecoration(labelText: 'Province'),
-                      onChanged: (value) => setState(() {
-                        _province = value;
-                        _district = null;
-                      }),
+                    onChanged: provinceAsync.isLoading
+                        ? null
+                        : (value) => setState(() {
+                              _province = value;
+                              _district = null;
+                            }),
                     ),
                   ),
                   SizedBox(
@@ -128,7 +131,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                           DropdownMenuItem(value: item, child: Text(item)),
                       ],
                       decoration: const InputDecoration(labelText: 'District'),
-                      onChanged: (value) => setState(() => _district = value),
+                    onChanged: provinceAsync.isLoading
+                        ? null
+                        : (value) => setState(() => _district = value),
                     ),
                   ),
                   SizedBox(

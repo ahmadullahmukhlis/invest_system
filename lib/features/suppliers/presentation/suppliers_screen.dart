@@ -204,6 +204,13 @@ class _SupplierFormDialogState extends ConsumerState<_SupplierFormDialog> {
   Widget build(BuildContext context) {
     final provinceAsync = ref.watch(provinceDataProvider);
     final provinces = provinceAsync.value ?? const [];
+    final isLoading = provinceAsync.isLoading;
+    if (_province != null &&
+        provinces.isNotEmpty &&
+        !provinces.any((item) => item.name == _province)) {
+      _province = null;
+      _district = null;
+    }
     final selectedProvince = provinces.firstWhere(
       (item) => item.name == _province,
       orElse: () =>
@@ -246,12 +253,17 @@ class _SupplierFormDialogState extends ConsumerState<_SupplierFormDialog> {
                       )
                   ],
                   decoration: const InputDecoration(labelText: 'Province'),
-                  onChanged: (value) {
+                  onChanged: isLoading
+                      ? null
+                      : (value) {
                     setState(() {
                       _province = value;
                       _district = null;
                     });
                   },
+                  disabledHint:
+                      isLoading ? const Text('Loading provinces...') : null,
+                  isExpanded: true,
                   validator: (value) =>
                       value == null || value.isEmpty ? 'Required' : null,
                 ),
@@ -266,10 +278,23 @@ class _SupplierFormDialogState extends ConsumerState<_SupplierFormDialog> {
                       )
                   ],
                   decoration: const InputDecoration(labelText: 'District'),
-                  onChanged: (value) => setState(() => _district = value),
+                  onChanged: isLoading
+                      ? null
+                      : (value) => setState(() => _district = value),
+                  disabledHint:
+                      isLoading ? const Text('Select province first') : null,
+                  isExpanded: true,
                   validator: (value) =>
                       value == null || value.isEmpty ? 'Required' : null,
                 ),
+                if (provinceAsync.hasError)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Province data not loaded. Run flutter pub get and restart the app.',
+                      style: TextStyle(color: Colors.redAccent),
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _address,
