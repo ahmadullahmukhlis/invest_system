@@ -86,9 +86,25 @@ class SalesScreen extends ConsumerWidget {
                           builder: (_) => SaleDetailScreen(sale: sale),
                         ),
                       );
+                      return;
                     }
                     if (value == 'receipt') {
                       await _showReceipt(context, sale, customerName, unitName);
+                      return;
+                    }
+                    final canEdit = await ref
+                        .read(saleRepositoryProvider)
+                        .canEdit(sale.id);
+                    if (!canEdit) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content:
+                                Text('You can only edit your own records.'),
+                          ),
+                        );
+                      }
+                      return;
                     }
                     if (value == 'edit') {
                       final updated = await showDialog<Sale>(

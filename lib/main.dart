@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/widgets/app_shell.dart';
+import 'core/data/sync_providers.dart';
+import 'core/data/sync_service.dart';
 import 'data/user_repository.dart';
 import 'features/customers/data/customer_providers.dart';
 import 'features/customers/data/customer_repository.dart';
@@ -154,6 +156,17 @@ class _AppBootstrapState extends State<AppBootstrap> {
                     .overrideWithValue(_purchaseRepository!),
                 supplierPaymentRepositoryProvider
                     .overrideWithValue(_supplierPaymentRepository!),
+                syncServiceProvider.overrideWithValue(
+                  SyncService(
+                    customers: _customerRepository!,
+                    suppliers: _supplierRepository!,
+                    units: _unitRepository!,
+                    sales: _saleRepository!,
+                    payments: _paymentRepository!,
+                    purchases: _purchaseRepository!,
+                    supplierPayments: _supplierPaymentRepository!,
+                  ),
+                ),
               ],
               child: const InvestSystemApp(home: AppShell()),
             );

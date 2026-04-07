@@ -8,6 +8,8 @@ import '../../supplier_payments/data/supplier_payment_repository.dart';
 import '../../supplier_payments/domain/supplier_payment.dart';
 import '../../suppliers/data/supplier_providers.dart';
 import '../../units/data/unit_providers.dart';
+import '../data/purchase_repository.dart';
+import '../data/purchase_providers.dart';
 import '../domain/purchase.dart';
 
 class PurchaseDetailScreen extends ConsumerWidget {
@@ -22,14 +24,13 @@ class PurchaseDetailScreen extends ConsumerWidget {
     final payments = ref.watch(supplierPaymentsProvider)
       ..sort((a, b) => b.date.compareTo(a.date));
 
-    final supplierName = suppliers.isEmpty
-        ? 'Unknown'
-        : suppliers
-            .firstWhere(
-              (item) => item.id == purchase.supplierId,
-              orElse: () => suppliers.first,
-            )
-            .name;
+    final supplier = suppliers.isEmpty
+        ? null
+        : suppliers.firstWhere(
+            (item) => item.id == purchase.supplierId,
+            orElse: () => suppliers.first,
+          );
+    final supplierName = supplier?.name ?? 'Unknown';
     final unitName = units.isEmpty
         ? ''
         : units
@@ -42,6 +43,8 @@ class PurchaseDetailScreen extends ConsumerWidget {
     final related = payments.where((p) => p.purchaseId == purchase.id).toList();
     final paid = related.fold(0.0, (sum, item) => sum + item.amount);
     final balance = purchase.totalPrice - paid;
+    final lastPaymentDate =
+        related.isEmpty ? null : related.first.date;
 
     return Scaffold(
       appBar: AppBar(
@@ -53,6 +56,25 @@ class PurchaseDetailScreen extends ConsumerWidget {
           ),
         ),
         actions: [
+          FutureBuilder<bool>(
+            future: ref.read(purchaseRepositoryProvider).canEdit(purchase.id),
+            builder: (context, snapshot) {
+              if (snapshot.data != true) return const SizedBox.shrink();
+              return IconButton(
+                onPressed: () async {
+                  final updated = await showDialog<Purchase>(
+                    context: context,
+                    builder: (_) => _EditPurchaseDialog(purchase: purchase),
+                  );
+                  if (updated != null) {
+                    await ref.read(purchaseRepositoryProvider).upsert(updated);
+                  }
+                },
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit',
+              );
+            },
+          ),
           IconButton(
             onPressed: () async {
               final created = await showDialog<SupplierPayment>(
@@ -72,6 +94,25 @@ class PurchaseDetailScreen extends ConsumerWidget {
             icon: const Icon(Icons.add_card_outlined),
             tooltip: 'Add Payment',
           ),
+          FutureBuilder<bool>(
+            future: ref.read(purchaseRepositoryProvider).canEdit(purchase.id),
+            builder: (context, snapshot) {
+              if (snapshot.data != true) return const SizedBox.shrink();
+              return IconButton(
+                onPressed: () async {
+                  final confirm = await _confirmDelete(context);
+                  if (confirm) {
+                    await ref
+                        .read(purchaseRepositoryProvider)
+                        .deleteById(purchase.id);
+                    if (context.mounted) Navigator.pop(context);
+                  }
+                },
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Delete',
+              );
+            },
+          ),
         ],
       ),
       drawer: const AppDrawer(),
@@ -85,6 +126,14 @@ class PurchaseDetailScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Supplier: $supplierName'),
+                  if (supplier != null) ...[
+                    Text('Phone: ${supplier.phone}'),
+                    Text(
+                        'Location: ${supplier.province}, ${supplier.district}'),
+                    if (supplier.address != null &&
+                        supplier.address!.isNotEmpty)
+                      Text('Address: ${supplier.address}'),
+                  ],
                   Text('Date: ${formatDate(purchase.date)}'),
                   const Divider(),
                   Text('Quantity: ${purchase.quantityValue} $unitName'),
@@ -92,6 +141,9 @@ class PurchaseDetailScreen extends ConsumerWidget {
                   Text('Total: ${formatMoney(purchase.totalPrice)}'),
                   Text('Paid: ${formatMoney(paid)}'),
                   Text('Balance: ${formatMoney(balance)}'),
+                  Text('Payments: ${related.length}'),
+                  if (lastPaymentDate != null)
+                    Text('Last Payment: ${formatDate(lastPaymentDate)}'),
                   if (purchase.note != null && purchase.note!.isNotEmpty) ...[
                     const Divider(),
                     Text('Note: ${purchase.note}'),
@@ -244,6 +296,155 @@ class _PaymentForPurchaseDialogState extends State<_PaymentForPurchaseDialog> {
                 purchaseId: widget.purchase.id,
                 date: _date,
                 amount: double.parse(_amount.text),
+                note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+              ),
+            );
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+Future<bool> _confirmDelete(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Delete purchase?'),
+      content: const Text('This action cannot be undone.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
+
+class _EditPurchaseDialog extends StatefulWidget {
+  const _EditPurchaseDialog({required this.purchase});
+
+  final Purchase purchase;
+
+  @override
+  State<_EditPurchaseDialog> createState() => _EditPurchaseDialogState();
+}
+
+class _EditPurchaseDialogState extends State<_EditPurchaseDialog> {
+  final _formKey = GlobalKey<FormState>();
+  DateTime _date = DateTime.now();
+  final _quantity = TextEditingController();
+  final _price = TextEditingController();
+  final _note = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _date = widget.purchase.date;
+    _quantity.text = widget.purchase.quantityValue.toString();
+    _price.text = widget.purchase.pricePerUnit.toString();
+    _note.text = widget.purchase.note ?? '';
+  }
+
+  @override
+  void dispose() {
+    _quantity.dispose();
+    _price.dispose();
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Purchase'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _quantity,
+                  decoration: const InputDecoration(labelText: 'Quantity'),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    final parsed = double.tryParse(value ?? '');
+                    if (parsed == null || parsed <= 0) {
+                      return 'Quantity must be > 0';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _price,
+                  decoration: const InputDecoration(labelText: 'Price per unit'),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    final parsed = double.tryParse(value ?? '');
+                    if (parsed == null || parsed <= 0) {
+                      return 'Price must be > 0';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _note,
+                  decoration: const InputDecoration(labelText: 'Note'),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Date'),
+                  subtitle: Text(formatDate(_date)),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.date_range_outlined),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2100),
+                        initialDate: _date,
+                      );
+                      if (picked != null) {
+                        setState(() => _date = picked);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (!(_formKey.currentState?.validate() ?? false)) return;
+            final quantity = double.parse(_quantity.text);
+            final price = double.parse(_price.text);
+            final total = quantity * price;
+            Navigator.pop(
+              context,
+              widget.purchase.copyWith(
+                date: _date,
+                quantityValue: quantity,
+                pricePerUnit: price,
+                totalPrice: total,
                 note: _note.text.trim().isEmpty ? null : _note.text.trim(),
               ),
             );

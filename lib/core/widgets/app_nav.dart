@@ -18,6 +18,7 @@ const navItems = <NavItem>[
   NavItem('Supplier Pay', Icons.account_balance_wallet_outlined),
   NavItem('Reports', Icons.assessment_outlined),
   NavItem('Units', Icons.scale_outlined),
+  NavItem('Settings', Icons.settings_outlined),
 ];
 
 final navIndexProvider = StateProvider<int>((ref) => 0);

@@ -70,6 +70,20 @@ class PaymentsScreen extends ConsumerWidget {
                 subtitle: Text(formatDate(payment.date)),
                 trailing: PopupMenuButton<String>(
                   onSelected: (value) async {
+                    final canEdit = await ref
+                        .read(paymentRepositoryProvider)
+                        .canEdit(payment.id);
+                    if (!canEdit) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content:
+                                Text('You can only edit your own records.'),
+                          ),
+                        );
+                      }
+                      return;
+                    }
                     if (value == 'edit') {
                       final updated = await showDialog<Payment>(
                         context: context,

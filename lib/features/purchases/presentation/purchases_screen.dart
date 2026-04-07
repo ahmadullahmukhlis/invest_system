@@ -88,6 +88,7 @@ class PurchasesScreen extends ConsumerWidget {
                           ),
                         ),
                       );
+                      return;
                     }
                     if (value == 'receipt') {
                       await _showReceipt(
@@ -96,6 +97,21 @@ class PurchasesScreen extends ConsumerWidget {
                         supplierName,
                         unitName,
                       );
+                      return;
+                    }
+                    final canEdit = await ref
+                        .read(purchaseRepositoryProvider)
+                        .canEdit(purchase.id);
+                    if (!canEdit) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content:
+                                Text('You can only edit your own records.'),
+                          ),
+                        );
+                      }
+                      return;
                     }
                     if (value == 'edit') {
                       final updated = await showDialog<Purchase>(

@@ -9,7 +9,10 @@ import '../../supplier_payments/data/supplier_payment_providers.dart';
 import '../../supplier_payments/domain/supplier_payment.dart';
 import '../../units/data/unit_providers.dart';
 import '../../units/domain/unit.dart';
+import '../data/supplier_repository.dart';
+import '../data/supplier_providers.dart';
 import '../domain/supplier.dart';
+import 'supplier_form_dialog.dart';
 
 class SupplierLedgerScreen extends ConsumerStatefulWidget {
   const SupplierLedgerScreen({super.key, required this.supplier});
@@ -71,6 +74,18 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
       return entry.copyWith(runningBalance: running);
     }).toList();
 
+    final totalPurchases =
+        purchases.fold(0.0, (sum, item) => sum + item.totalPrice);
+    final totalPayments =
+        payments.fold(0.0, (sum, item) => sum + item.amount);
+    final balance = totalPurchases - totalPayments;
+    final lastPurchaseDate = purchases.isEmpty
+        ? null
+        : (purchases..sort((a, b) => b.date.compareTo(a.date))).first.date;
+    final lastPaymentDate = payments.isEmpty
+        ? null
+        : (payments..sort((a, b) => b.date.compareTo(a.date))).first.date;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Supplier • ${widget.supplier.name}'),
@@ -81,6 +96,50 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
           ),
         ),
         actions: [
+          FutureBuilder<bool>(
+            future:
+                ref.read(supplierRepositoryProvider).canEdit(widget.supplier.id),
+            builder: (context, snapshot) {
+              if (snapshot.data != true) return const SizedBox.shrink();
+              return IconButton(
+                onPressed: () async {
+                  final updated = await showDialog<Supplier>(
+                    context: context,
+                    builder: (context) => SupplierFormDialog(
+                      existing: widget.supplier,
+                    ),
+                  );
+                  if (updated != null) {
+                    await ref
+                        .read(supplierRepositoryProvider)
+                        .upsert(updated);
+                  }
+                },
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit',
+              );
+            },
+          ),
+          FutureBuilder<bool>(
+            future:
+                ref.read(supplierRepositoryProvider).canEdit(widget.supplier.id),
+            builder: (context, snapshot) {
+              if (snapshot.data != true) return const SizedBox.shrink();
+              return IconButton(
+                onPressed: () async {
+                  final confirm = await _confirmDelete(context);
+                  if (confirm) {
+                    await ref
+                        .read(supplierRepositoryProvider)
+                        .deleteById(widget.supplier.id);
+                    if (context.mounted) Navigator.pop(context);
+                  }
+                },
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Delete',
+              );
+            },
+          ),
           IconButton(
             onPressed: () async {
               final created = await showDialog<Purchase>(
@@ -139,31 +198,66 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
       drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Card(
-          child: ListView.separated(
-            itemCount: rows.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final entry = rows[index];
-              return ListTile(
-                leading: Icon(
-                  entry.isDebit
-                      ? Icons.arrow_upward
-                      : Icons.arrow_downward,
-                ),
-                title: Text('${entry.type} • ${formatDate(entry.date)}'),
-                subtitle: Text(entry.note ?? 'No note'),
-                trailing: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
+        child: ListView(
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(formatMoney(entry.amount)),
-                    Text('Balance: ${formatMoney(entry.runningBalance)}'),
+                    Text('Supplier Info',
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    Text('Name: ${widget.supplier.name}'),
+                    Text('Phone: ${widget.supplier.phone}'),
+                    Text(
+                        'Location: ${widget.supplier.province}, ${widget.supplier.district}'),
+                    if (widget.supplier.address != null &&
+                        widget.supplier.address!.isNotEmpty)
+                      Text('Address: ${widget.supplier.address}'),
+                    const Divider(),
+                    Text('Total Purchases: ${formatMoney(totalPurchases)}'),
+                    Text('Total Payments: ${formatMoney(totalPayments)}'),
+                    Text('Balance: ${formatMoney(balance)}'),
+                    if (lastPurchaseDate != null)
+                      Text('Last Purchase: ${formatDate(lastPurchaseDate)}'),
+                    if (lastPaymentDate != null)
+                      Text('Last Payment: ${formatDate(lastPaymentDate)}'),
                   ],
                 ),
-              );
-            },
-          ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: rows.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final entry = rows[index];
+                  return ListTile(
+                    leading: Icon(
+                      entry.isDebit
+                          ? Icons.arrow_upward
+                          : Icons.arrow_downward,
+                    ),
+                    title: Text('${entry.type} • ${formatDate(entry.date)}'),
+                    subtitle: Text(entry.note ?? 'No note'),
+                    trailing: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(formatMoney(entry.amount)),
+                        Text('Balance: ${formatMoney(entry.runningBalance)}'),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -478,4 +572,25 @@ class _PaymentForSupplierDialogState extends State<_PaymentForSupplierDialog> {
       ],
     );
   }
+}
+
+Future<bool> _confirmDelete(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Delete supplier?'),
+      content: const Text('This action cannot be undone.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
 }

@@ -7,6 +7,7 @@ import '../../features/payments/presentation/payments_screen.dart';
 import '../../features/purchases/presentation/purchases_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
 import '../../features/sales/presentation/sales_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/suppliers/presentation/suppliers_screen.dart';
 import '../../features/supplier_payments/presentation/supplier_payments_screen.dart';
 import '../../features/units/presentation/units_screen.dart';
@@ -28,6 +29,7 @@ class AppShell extends ConsumerWidget {
       SupplierPaymentsScreen(),
       ReportsScreen(),
       UnitsScreen(),
+      SettingsScreen(),
     ];
 
     return IndexedStack(

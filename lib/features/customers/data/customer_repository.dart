@@ -69,6 +69,13 @@ class CustomerRepository {
     final resolved = customer.id.isEmpty
         ? customer.copyWith(id: newId())
         : customer;
+    if (resolved.id.isNotEmpty) {
+      final existing = await _localDb.getById('customers', resolved.id);
+      if (existing != null &&
+          (existing['owner_uid'] as String? ?? '') != _currentUid) {
+        return;
+      }
+    }
     final row = _toRow(
       resolved,
       ownerUid: _currentUid,
@@ -88,9 +95,11 @@ class CustomerRepository {
     final existing = await _localDb.getById(
       'customers',
       id,
-      ownerUid: _currentUid,
     );
     if (existing == null) return;
+    if ((existing['owner_uid'] as String? ?? '') != _currentUid) {
+      return;
+    }
     final updated = Map<String, Object?>.from(existing);
     updated['deleted'] = 1;
     updated['dirty'] = 1;
@@ -101,6 +110,12 @@ class CustomerRepository {
     if (_online) {
       await _pushRow(updated);
     }
+  }
+
+  Future<bool> canEdit(String id) async {
+    final existing = await _localDb.getById('customers', id);
+    if (existing == null) return false;
+    return (existing['owner_uid'] as String? ?? '') == _currentUid;
   }
 
   String get _currentUid => _auth.currentUser?.uid ?? '';
@@ -341,6 +356,29 @@ class CustomerRepository {
       'updated_at': row['updated_at'],
       'deleted': row['deleted'],
     };
+  }
+
+  Future<void> syncNow() async {
+    final current = await _connectivity.checkConnectivity();
+    await _handleConnectivity(current, force: true);
+  }
+
+  Future<void> pullRemoteNow() async {
+    if (_online) {
+      await _startRemoteSync();
+    } else {
+      final current = await _connectivity.checkConnectivity();
+      await _handleConnectivity(current, force: true);
+    }
+  }
+
+  Future<void> pushLocalNow() async {
+    if (_online) {
+      await _pushDirty();
+    } else {
+      final current = await _connectivity.checkConnectivity();
+      await _handleConnectivity(current, force: true);
+    }
   }
 }
 

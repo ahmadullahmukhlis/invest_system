@@ -79,7 +79,7 @@ class UnitRepository {
     final resolved = unit.id.isEmpty ? unit.copyWith(id: newId()) : unit;
     final row = _toRow(
       resolved,
-      ownerUid: _currentUid,
+      ownerUid: '',
       updatedAt: now,
       dirty: true,
       deleted: 0,
@@ -93,7 +93,7 @@ class UnitRepository {
   }
 
   Future<void> toggleActive(String id) async {
-    final existing = await _localDb.getById('units', id, ownerUid: _currentUid);
+    final existing = await _localDb.getById('units', id);
     if (existing == null) return;
     final updated = Map<String, Object?>.from(existing);
     final currentActive = (existing['is_active'] as int? ?? 1) == 1;
@@ -108,7 +108,7 @@ class UnitRepository {
   }
 
   Future<void> deleteById(String id) async {
-    final existing = await _localDb.getById('units', id, ownerUid: _currentUid);
+    final existing = await _localDb.getById('units', id);
     if (existing == null) return;
     final updated = Map<String, Object?>.from(existing);
     updated['deleted'] = 1;
@@ -123,14 +123,8 @@ class UnitRepository {
 
   String get _currentUid => _auth.currentUser?.uid ?? '';
 
-  bool get _isGlobal =>
-      _userRepository.currentRole == 'admin' ||
-      _userRepository.currentRole == 'super_admin';
-
   DatabaseReference _ref() {
-    return _isGlobal
-        ? _database.ref('units')
-        : _database.ref('units/$_currentUid');
+    return _database.ref('units');
   }
 
   Future<void> _handleConnectivity(
@@ -155,8 +149,7 @@ class UnitRepository {
   Future<void> _loadLocal() async {
     final rows = await _localDb.getAll(
       'units',
-      ownerUid: _currentUid,
-      all: _isGlobal,
+      all: true,
     );
     _items = rows.map(_fromRow).toList();
     _controller.add(_items);
@@ -180,77 +173,39 @@ class UnitRepository {
     if (value is! Map) return;
     var changed = false;
 
-    if (_isGlobal) {
-      for (final userEntry in value.entries) {
-        final ownerUid = userEntry.key;
-        final userData = userEntry.value;
-        if (ownerUid is! String || userData is! Map) continue;
-        for (final entry in userData.entries) {
-          final key = entry.key;
-          final data = entry.value;
-          if (key is! String || data is! Map) continue;
-          final remote = _fromJson(key, ownerUid, data.cast<dynamic, dynamic>());
-          final local =
-              await _localDb.getById('units', remote.id, ownerUid: ownerUid);
-          final localUpdated = (local?['updated_at'] as int?) ?? 0;
-          if (remote.deleted == 1) {
-            if (local != null) {
-              await _localDb.delete('units', remote.id);
-              changed = true;
-            }
-            continue;
-          }
-          if (local == null || remote.updatedAt > localUpdated) {
-            await _localDb.upsert(
-              'units',
-              _toRow(
-                remote.data,
-                ownerUid: ownerUid,
-                updatedAt: remote.updatedAt,
-                dirty: false,
-                deleted: 0,
-              ),
-            );
-            changed = true;
-          }
-        }
-      }
-    } else {
-      for (final entry in value.entries) {
-        final key = entry.key;
-        final data = entry.value;
-        if (key is! String || data is! Map) continue;
-        final remote = _fromJson(
-          key,
-          _currentUid,
-          data.cast<dynamic, dynamic>(),
-        );
-        final local = await _localDb.getById(
-          'units',
-          remote.id,
-          ownerUid: _currentUid,
-        );
-        final localUpdated = (local?['updated_at'] as int?) ?? 0;
-        if (remote.deleted == 1) {
-          if (local != null) {
-            await _localDb.delete('units', remote.id);
-            changed = true;
-          }
-          continue;
-        }
-        if (local == null || remote.updatedAt > localUpdated) {
-          await _localDb.upsert(
-            'units',
-            _toRow(
-              remote.data,
-              ownerUid: _currentUid,
-              updatedAt: remote.updatedAt,
-              dirty: false,
-              deleted: 0,
-            ),
-          );
+    for (final entry in value.entries) {
+      final key = entry.key;
+      final data = entry.value;
+      if (key is! String || data is! Map) continue;
+      final remote = _fromJson(
+        key,
+        '',
+        data.cast<dynamic, dynamic>(),
+      );
+      final local = await _localDb.getById(
+        'units',
+        remote.id,
+      );
+      final localUpdated = (local?['updated_at'] as int?) ?? 0;
+      if (remote.deleted == 1) {
+        if (local != null) {
+          await _localDb.delete('units', remote.id);
           changed = true;
         }
+        continue;
+      }
+      if (local == null || remote.updatedAt > localUpdated) {
+        await _localDb.upsert(
+          'units',
+          _toRow(
+            remote.data,
+            ownerUid: '',
+            updatedAt: remote.updatedAt,
+            dirty: false,
+            deleted: 0,
+          ),
+        );
+        changed = true;
       }
     }
 
@@ -262,8 +217,7 @@ class UnitRepository {
   Future<void> _pushDirty() async {
     final rows = await _localDb.getDirty(
       'units',
-      ownerUid: _currentUid,
-      all: _isGlobal,
+      all: true,
     );
     for (final row in rows) {
       await _pushRow(row);
@@ -271,17 +225,12 @@ class UnitRepository {
   }
 
   Future<void> _pushRow(Map<String, Object?> row) async {
-    final ownerUid = row['owner_uid'] as String? ?? '';
     final id = row['id'] as String? ?? '';
     if (id.isEmpty) return;
     final isDeleted = (row['deleted'] as int? ?? 0) == 1;
     final payload = _toJson(row);
 
-    if (_isGlobal) {
-      await _database.ref('units/$ownerUid/$id').set(payload);
-    } else {
-      await _ref().child(id).set(payload);
-    }
+    await _ref().child(id).set(payload);
 
     if (isDeleted) {
       await _localDb.delete('units', id);
@@ -341,6 +290,29 @@ class UnitRepository {
       'updated_at': row['updated_at'],
       'deleted': row['deleted'],
     };
+  }
+
+  Future<void> syncNow() async {
+    final current = await _connectivity.checkConnectivity();
+    await _handleConnectivity(current, force: true);
+  }
+
+  Future<void> pullRemoteNow() async {
+    if (_online) {
+      await _startRemoteSync();
+    } else {
+      final current = await _connectivity.checkConnectivity();
+      await _handleConnectivity(current, force: true);
+    }
+  }
+
+  Future<void> pushLocalNow() async {
+    if (_online) {
+      await _pushDirty();
+    } else {
+      final current = await _connectivity.checkConnectivity();
+      await _handleConnectivity(current, force: true);
+    }
   }
 }
 

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
 import '../../payments/data/payment_providers.dart';
+import 'customer_form_dialog.dart';
+import '../data/customer_providers.dart';
 import '../../payments/domain/payment.dart';
 import '../../sales/data/sale_providers.dart';
 import '../../sales/domain/sale.dart';
@@ -71,6 +73,17 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
       return entry.copyWith(runningBalance: running);
     }).toList();
 
+    final totalSales =
+        sales.fold(0.0, (sum, item) => sum + item.totalPrice);
+    final totalPayments =
+        payments.fold(0.0, (sum, item) => sum + item.amount);
+    final balance = totalSales - totalPayments;
+    final lastSaleDate =
+        sales.isEmpty ? null : (sales..sort((a, b) => b.date.compareTo(a.date))).first.date;
+    final lastPaymentDate = payments.isEmpty
+        ? null
+        : (payments..sort((a, b) => b.date.compareTo(a.date))).first.date;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Ledger • ${widget.customer.name}'),
@@ -81,6 +94,47 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
           ),
         ),
         actions: [
+          FutureBuilder<bool>(
+            future:
+                ref.read(customerRepositoryProvider).canEdit(widget.customer.id),
+            builder: (context, snapshot) {
+              if (snapshot.data != true) return const SizedBox.shrink();
+              return IconButton(
+                onPressed: () async {
+                  final updated = await showDialog<Customer>(
+                    context: context,
+                    builder: (context) => CustomerFormDialog(
+                      existing: widget.customer,
+                    ),
+                  );
+                  if (updated != null) {
+                    await ref.read(customerRepositoryProvider).upsert(updated);
+                  }
+                },
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit',
+              );
+            },
+          ),
+          FutureBuilder<bool>(
+            future: ref.read(customerRepositoryProvider).canEdit(widget.customer.id),
+            builder: (context, snapshot) {
+              if (snapshot.data != true) return const SizedBox.shrink();
+              return IconButton(
+                onPressed: () async {
+                  final confirm = await _confirmDelete(context);
+                  if (confirm) {
+                    await ref
+                        .read(customerRepositoryProvider)
+                        .deleteById(widget.customer.id);
+                    if (context.mounted) Navigator.pop(context);
+                  }
+                },
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Delete',
+              );
+            },
+          ),
           IconButton(
             onPressed: () async {
               final created = await showDialog<Sale>(
@@ -137,31 +191,66 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
       drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Card(
-          child: ListView.separated(
-            itemCount: rows.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final entry = rows[index];
-              return ListTile(
-                leading: Icon(
-                  entry.isCredit
-                      ? Icons.arrow_upward
-                      : Icons.arrow_downward,
-                ),
-                title: Text('${entry.type} • ${formatDate(entry.date)}'),
-                subtitle: Text(entry.note ?? 'No note'),
-                trailing: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
+        child: ListView(
+          children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(formatMoney(entry.amount)),
-                    Text('Balance: ${formatMoney(entry.runningBalance)}'),
+                    Text('Customer Info',
+                        style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    Text('Name: ${widget.customer.name}'),
+                    Text('Phone: ${widget.customer.phone}'),
+                    Text(
+                        'Location: ${widget.customer.province}, ${widget.customer.district}'),
+                    if (widget.customer.address != null &&
+                        widget.customer.address!.isNotEmpty)
+                      Text('Address: ${widget.customer.address}'),
+                    const Divider(),
+                    Text('Total Sales: ${formatMoney(totalSales)}'),
+                    Text('Total Payments: ${formatMoney(totalPayments)}'),
+                    Text('Balance: ${formatMoney(balance)}'),
+                    if (lastSaleDate != null)
+                      Text('Last Sale: ${formatDate(lastSaleDate)}'),
+                    if (lastPaymentDate != null)
+                      Text('Last Payment: ${formatDate(lastPaymentDate)}'),
                   ],
                 ),
-              );
-            },
-          ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: rows.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final entry = rows[index];
+                  return ListTile(
+                    leading: Icon(
+                      entry.isCredit
+                          ? Icons.arrow_upward
+                          : Icons.arrow_downward,
+                    ),
+                    title: Text('${entry.type} • ${formatDate(entry.date)}'),
+                    subtitle: Text(entry.note ?? 'No note'),
+                    trailing: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(formatMoney(entry.amount)),
+                        Text('Balance: ${formatMoney(entry.runningBalance)}'),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -195,6 +284,27 @@ class _LedgerEntry {
       runningBalance: runningBalance ?? this.runningBalance,
     );
   }
+}
+
+Future<bool> _confirmDelete(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Delete customer?'),
+      content: const Text('This action cannot be undone.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
 }
 
 class _SaleForCustomerDialog extends StatefulWidget {

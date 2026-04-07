@@ -8,6 +8,8 @@ import '../../payments/data/payment_providers.dart';
 import '../../payments/data/payment_repository.dart';
 import '../../payments/domain/payment.dart';
 import '../../units/data/unit_providers.dart';
+import '../data/sale_providers.dart';
+import '../data/sale_repository.dart';
 import '../domain/sale.dart';
 
 class SaleDetailScreen extends ConsumerWidget {
@@ -22,14 +24,13 @@ class SaleDetailScreen extends ConsumerWidget {
     final payments = ref.watch(paymentsProvider)
       ..sort((a, b) => b.date.compareTo(a.date));
 
-    final customerName = customers.isEmpty
-        ? 'Unknown'
-        : customers
-            .firstWhere(
-              (item) => item.id == sale.customerId,
-              orElse: () => customers.first,
-            )
-            .name;
+    final customer = customers.isEmpty
+        ? null
+        : customers.firstWhere(
+            (item) => item.id == sale.customerId,
+            orElse: () => customers.first,
+          );
+    final customerName = customer?.name ?? 'Unknown';
     final unitName = units.isEmpty
         ? ''
         : units
@@ -42,6 +43,8 @@ class SaleDetailScreen extends ConsumerWidget {
     final related = payments.where((p) => p.saleId == sale.id).toList();
     final paid = related.fold(0.0, (sum, item) => sum + item.amount);
     final balance = sale.totalPrice - paid;
+    final lastPaymentDate =
+        related.isEmpty ? null : related.first.date;
 
     return Scaffold(
       appBar: AppBar(
@@ -53,6 +56,27 @@ class SaleDetailScreen extends ConsumerWidget {
           ),
         ),
         actions: [
+          FutureBuilder<bool>(
+            future: ref.read(saleRepositoryProvider).canEdit(sale.id),
+            builder: (context, snapshot) {
+              if (snapshot.data != true) return const SizedBox.shrink();
+              return IconButton(
+                onPressed: () async {
+                  final updated = await showDialog<Sale>(
+                    context: context,
+                    builder: (_) => _EditSaleDialog(
+                      sale: sale,
+                    ),
+                  );
+                  if (updated != null) {
+                    await ref.read(saleRepositoryProvider).upsert(updated);
+                  }
+                },
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit',
+              );
+            },
+          ),
           IconButton(
             onPressed: () async {
               final created = await showDialog<Payment>(
@@ -70,6 +94,23 @@ class SaleDetailScreen extends ConsumerWidget {
             icon: const Icon(Icons.add_card_outlined),
             tooltip: 'Add Payment',
           ),
+          FutureBuilder<bool>(
+            future: ref.read(saleRepositoryProvider).canEdit(sale.id),
+            builder: (context, snapshot) {
+              if (snapshot.data != true) return const SizedBox.shrink();
+              return IconButton(
+                onPressed: () async {
+                  final confirm = await _confirmDelete(context);
+                  if (confirm) {
+                    await ref.read(saleRepositoryProvider).deleteById(sale.id);
+                    if (context.mounted) Navigator.pop(context);
+                  }
+                },
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Delete',
+              );
+            },
+          ),
         ],
       ),
       drawer: const AppDrawer(),
@@ -83,6 +124,14 @@ class SaleDetailScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Customer: $customerName'),
+                  if (customer != null) ...[
+                    Text('Phone: ${customer.phone}'),
+                    Text(
+                        'Location: ${customer.province}, ${customer.district}'),
+                    if (customer.address != null &&
+                        customer.address!.isNotEmpty)
+                      Text('Address: ${customer.address}'),
+                  ],
                   Text('Date: ${formatDate(sale.date)}'),
                   const Divider(),
                   Text('Quantity: ${sale.quantityValue} $unitName'),
@@ -90,6 +139,9 @@ class SaleDetailScreen extends ConsumerWidget {
                   Text('Total: ${formatMoney(sale.totalPrice)}'),
                   Text('Paid: ${formatMoney(paid)}'),
                   Text('Balance: ${formatMoney(balance)}'),
+                  Text('Payments: ${related.length}'),
+                  if (lastPaymentDate != null)
+                    Text('Last Payment: ${formatDate(lastPaymentDate)}'),
                   if (sale.note != null && sale.note!.isNotEmpty) ...[
                     const Divider(),
                     Text('Note: ${sale.note}'),
@@ -126,6 +178,134 @@ class SaleDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EditSaleDialog extends StatefulWidget {
+  const _EditSaleDialog({required this.sale});
+
+  final Sale sale;
+
+  @override
+  State<_EditSaleDialog> createState() => _EditSaleDialogState();
+}
+
+class _EditSaleDialogState extends State<_EditSaleDialog> {
+  final _formKey = GlobalKey<FormState>();
+  DateTime _date = DateTime.now();
+  final _quantity = TextEditingController();
+  final _price = TextEditingController();
+  final _note = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _date = widget.sale.date;
+    _quantity.text = widget.sale.quantityValue.toString();
+    _price.text = widget.sale.pricePerUnit.toString();
+    _note.text = widget.sale.note ?? '';
+  }
+
+  @override
+  void dispose() {
+    _quantity.dispose();
+    _price.dispose();
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Sale'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _quantity,
+                  decoration: const InputDecoration(labelText: 'Quantity'),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    final parsed = double.tryParse(value ?? '');
+                    if (parsed == null || parsed <= 0) {
+                      return 'Quantity must be > 0';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _price,
+                  decoration: const InputDecoration(labelText: 'Price per unit'),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    final parsed = double.tryParse(value ?? '');
+                    if (parsed == null || parsed <= 0) {
+                      return 'Price must be > 0';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _note,
+                  decoration: const InputDecoration(labelText: 'Note'),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Date'),
+                  subtitle: Text(formatDate(_date)),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.date_range_outlined),
+                    onPressed: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2100),
+                        initialDate: _date,
+                      );
+                      if (picked != null) {
+                        setState(() => _date = picked);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (!(_formKey.currentState?.validate() ?? false)) return;
+            final quantity = double.parse(_quantity.text);
+            final price = double.parse(_price.text);
+            final total = quantity * price;
+            Navigator.pop(
+              context,
+              widget.sale.copyWith(
+                date: _date,
+                quantityValue: quantity,
+                pricePerUnit: price,
+                totalPrice: total,
+                note: _note.text.trim().isEmpty ? null : _note.text.trim(),
+              ),
+            );
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
@@ -250,4 +430,25 @@ class _PaymentForSaleDialogState extends State<_PaymentForSaleDialog> {
       ],
     );
   }
+}
+
+Future<bool> _confirmDelete(BuildContext context) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Delete sale?'),
+      content: const Text('This action cannot be undone.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
 }
