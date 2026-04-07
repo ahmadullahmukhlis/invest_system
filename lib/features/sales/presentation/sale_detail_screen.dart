@@ -414,6 +414,9 @@ class _PaymentForSaleDialogState extends State<_PaymentForSaleDialog> {
                     if (parsed > widget.balance) {
                       return 'Payment exceeds balance';
                     }
+                    if (parsed > widget.customerRemaining) {
+                      return 'Payment exceeds customer remaining balance';
+                    }
                     return null;
                   },
                 ),

@@ -533,12 +533,14 @@ class _PaymentForCustomerDialogState extends State<_PaymentForCustomerDialog> {
                 const Divider(height: 16),
                 DropdownButtonFormField<String>(
                   value: _saleId,
+                  isExpanded: true,
                   items: [
                     for (final sale in widget.sales)
                       DropdownMenuItem(
                         value: sale.id,
                         child: Text(
                           '${formatDate(sale.date)} • ${formatMoney(sale.totalPrice)}',
+                          overflow: TextOverflow.ellipsis,
                         ),
                       )
                   ],
@@ -555,6 +557,9 @@ class _PaymentForCustomerDialogState extends State<_PaymentForCustomerDialog> {
                     final parsed = double.tryParse(value ?? '');
                     if (parsed == null || parsed <= 0) {
                       return 'Amount must be > 0';
+                    }
+                    if (parsed > widget.remainingBalance) {
+                      return 'Payment exceeds remaining balance';
                     }
                     return null;
                   },
