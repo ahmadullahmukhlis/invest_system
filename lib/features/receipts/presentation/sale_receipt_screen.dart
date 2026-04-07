@@ -51,101 +51,118 @@ class SaleReceiptScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: AppColors.accent.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.receipt_long_outlined,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Sale Receipt',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                            Text(
-                              'Receipt ID: ${sale.id}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          formatDate(sale.date),
-                          style: const TextStyle(
-                            color: AppColors.success,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  _InfoGroup(
-                    title: 'Customer',
-                    items: [
-                      _InfoItem('Name', customerName),
-                      _InfoItem('Phone', customer?.phone ?? '-'),
-                      _InfoItem(
-                        'Location',
-                        customer == null
-                            ? '-'
-                            : '${customer.province}, ${customer.district}',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _InfoGroup(
-                    title: 'Sale Details',
-                    items: [
-                      _InfoItem('Quantity', '${sale.quantityValue} $unitName'),
-                      _InfoItem(
-                          'Price per unit', formatMoney(sale.pricePerUnit)),
-                      _InfoItem('Total', formatMoney(sale.totalPrice)),
-                      _InfoItem('Paid', formatMoney(paid)),
-                      _InfoItem('Balance', formatMoney(balance)),
-                    ],
-                  ),
-                  if (sale.note != null && sale.note!.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    _InfoGroup(
-                      title: 'Note',
-                      items: [
-                        _InfoItem('Message', sale.note!),
-                      ],
-                    ),
-                  ],
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.accent.withOpacity(0.15),
+                  AppColors.indigo.withOpacity(0.08),
                 ],
               ),
             ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.receipt_long_outlined,
+                    color: AppColors.accent,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sale Receipt',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        'Receipt ID: ${sale.id}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    formatDate(sale.date),
+                    style: const TextStyle(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _StatChip(label: 'Total', value: formatMoney(sale.totalPrice)),
+              _StatChip(label: 'Paid', value: formatMoney(paid)),
+              _StatChip(label: 'Balance', value: formatMoney(balance)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _InfoGroup(
+            title: 'Customer',
+            items: [
+              _InfoItem('Name', customerName),
+              _InfoItem('Phone', customer?.phone ?? '-'),
+              _InfoItem(
+                'Location',
+                customer == null
+                    ? '-'
+                    : '${customer.province}, ${customer.district}',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _InfoGroup(
+            title: 'Sale Details',
+            items: [
+              _InfoItem('Quantity', '${sale.quantityValue} $unitName'),
+              _InfoItem('Price per unit', formatMoney(sale.pricePerUnit)),
+              _InfoItem('Total', formatMoney(sale.totalPrice)),
+              _InfoItem('Paid', formatMoney(paid)),
+              _InfoItem('Balance', formatMoney(balance)),
+            ],
+          ),
+          if (sale.note != null && sale.note!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _InfoGroup(
+              title: 'Note',
+              items: [
+                _InfoItem('Message', sale.note!),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          _PaymentsCard(
+            title: 'Payment History',
+            payments: related,
+            emptyText: 'No payments recorded for this sale.',
           ),
         ],
       ),
@@ -273,6 +290,110 @@ class _InfoItem {
   _InfoItem(this.label, this.value);
   final String label;
   final String value;
+}
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.muted,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentsCard extends StatelessWidget {
+  const _PaymentsCard({
+    required this.title,
+    required this.payments,
+    required this.emptyText,
+  });
+
+  final String title;
+  final List<dynamic> payments;
+  final String emptyText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            if (payments.isEmpty)
+              Text(
+                emptyText,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.muted,
+                    ),
+              )
+            else
+              Column(
+                children: [
+                  for (final payment in payments) ...[
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.payments_outlined,
+                          color: AppColors.success,
+                          size: 18,
+                        ),
+                      ),
+                      title: Text(formatMoney(payment.amount)),
+                      subtitle: Text(formatDate(payment.date)),
+                    ),
+                    const Divider(height: 1),
+                  ],
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 Future<Uint8List> _buildSalePdf({
