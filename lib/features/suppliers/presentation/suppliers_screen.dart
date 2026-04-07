@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/data/geo_providers.dart';
+import '../../../core/data/geo_data.dart';
 import '../../purchases/data/purchase_providers.dart';
 import '../../supplier_payments/data/supplier_payment_providers.dart';
 import '../data/supplier_providers.dart';
@@ -163,30 +165,30 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
   }
 }
 
-class _SupplierFormDialog extends StatefulWidget {
+class _SupplierFormDialog extends ConsumerStatefulWidget {
   const _SupplierFormDialog({this.existing});
 
   final Supplier? existing;
 
   @override
-  State<_SupplierFormDialog> createState() => _SupplierFormDialogState();
+  ConsumerState<_SupplierFormDialog> createState() => _SupplierFormDialogState();
 }
 
-class _SupplierFormDialogState extends State<_SupplierFormDialog> {
+class _SupplierFormDialogState extends ConsumerState<_SupplierFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _phone;
-  late final TextEditingController _province;
-  late final TextEditingController _district;
   late final TextEditingController _address;
+  String? _province;
+  String? _district;
 
   @override
   void initState() {
     super.initState();
     _name = TextEditingController(text: widget.existing?.name ?? '');
     _phone = TextEditingController(text: widget.existing?.phone ?? '');
-    _province = TextEditingController(text: widget.existing?.province ?? '');
-    _district = TextEditingController(text: widget.existing?.district ?? '');
+    _province = widget.existing?.province;
+    _district = widget.existing?.district;
     _address = TextEditingController(text: widget.existing?.address ?? '');
   }
 
@@ -194,14 +196,23 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
   void dispose() {
     _name.dispose();
     _phone.dispose();
-    _province.dispose();
-    _district.dispose();
     _address.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final provinceAsync = ref.watch(provinceDataProvider);
+    final provinces = provinceAsync.value ?? const [];
+    final selectedProvince = provinces.firstWhere(
+      (item) => item.name == _province,
+      orElse: () =>
+          provinces.isNotEmpty ? provinces.first : _emptyProvince,
+    );
+    final districtOptions = _province == null
+        ? const <String>[]
+        : selectedProvince.districts;
+
     return AlertDialog(
       title: Text(widget.existing == null ? 'Add Supplier' : 'Edit Supplier'),
       content: SizedBox(
@@ -225,16 +236,37 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
                       value == null || value.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: _province,
+                DropdownButtonFormField<String>(
+                  value: _province,
+                  items: [
+                    for (final item in provinces)
+                      DropdownMenuItem(
+                        value: item.name,
+                        child: Text(item.name),
+                      )
+                  ],
                   decoration: const InputDecoration(labelText: 'Province'),
+                  onChanged: (value) {
+                    setState(() {
+                      _province = value;
+                      _district = null;
+                    });
+                  },
                   validator: (value) =>
                       value == null || value.isEmpty ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: _district,
+                DropdownButtonFormField<String>(
+                  value: _district,
+                  items: [
+                    for (final item in districtOptions)
+                      DropdownMenuItem(
+                        value: item,
+                        child: Text(item),
+                      )
+                  ],
                   decoration: const InputDecoration(labelText: 'District'),
+                  onChanged: (value) => setState(() => _district = value),
                   validator: (value) =>
                       value == null || value.isEmpty ? 'Required' : null,
                 ),
@@ -260,8 +292,8 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
               id: widget.existing?.id ?? '',
               name: _name.text.trim(),
               phone: _phone.text.trim(),
-              province: _province.text.trim(),
-              district: _district.text.trim(),
+              province: _province ?? '',
+              district: _district ?? '',
               address: _address.text.trim().isEmpty
                   ? null
                   : _address.text.trim(),
@@ -274,6 +306,8 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
     );
   }
 }
+
+const _emptyProvince = ProvinceData(name: '', districts: []);
 
 Future<bool> _confirmDelete(BuildContext context) async {
   final result = await showDialog<bool>(

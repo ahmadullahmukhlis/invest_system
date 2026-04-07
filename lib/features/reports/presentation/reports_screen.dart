@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/data/geo_providers.dart';
+import '../../../core/data/geo_data.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../purchases/data/purchase_providers.dart';
 import '../../sales/data/sale_providers.dart';
@@ -29,16 +31,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final sales = ref.watch(salesProvider);
     final purchases = ref.watch(purchasesProvider);
     final units = ref.watch(unitsProvider);
+    final provincesData = ref.watch(provinceDataProvider).value ?? const [];
 
-    final provinces = {
-      ...customers.map((item) => item.province),
-      ...suppliers.map((item) => item.province),
-    }.toList();
-
-    final districts = {
-      ...customers.map((item) => item.district),
-      ...suppliers.map((item) => item.district),
-    }.toList();
+    final provinces = provincesData.map((p) => p.name).toList();
+    final selectedProvince = provincesData.firstWhere(
+      (item) => item.name == _province,
+      orElse: () =>
+          provincesData.isNotEmpty ? provincesData.first : _emptyProvince,
+    );
+    final districts =
+        _province == null ? const <String>[] : selectedProvince.districts;
 
     final filteredSales = sales.where((sale) {
       if (_range != null) {
@@ -111,7 +113,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                           DropdownMenuItem(value: item, child: Text(item)),
                       ],
                       decoration: const InputDecoration(labelText: 'Province'),
-                      onChanged: (value) => setState(() => _province = value),
+                      onChanged: (value) => setState(() {
+                        _province = value;
+                        _district = null;
+                      }),
                     ),
                   ),
                   SizedBox(
@@ -244,3 +249,5 @@ class _ReportCard extends StatelessWidget {
     );
   }
 }
+
+const _emptyProvince = ProvinceData(name: '', districts: []);
