@@ -6,10 +6,15 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../customers/data/customer_providers.dart';
+import '../../customers/domain/customer.dart';
 import '../../payments/data/payment_providers.dart';
+import '../../payments/domain/payment.dart';
 import '../../sales/data/sale_providers.dart';
+import '../../sales/domain/sale.dart';
 import '../../suppliers/data/supplier_providers.dart';
+import '../../suppliers/domain/supplier.dart';
 import '../../supplier_payments/data/supplier_payment_providers.dart';
+import '../../supplier_payments/domain/supplier_payment.dart';
 import 'dashboard_providers.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -213,11 +218,11 @@ class _RecentTransactionsCard extends StatelessWidget {
     required this.supplierPayments,
   });
 
-  final List<dynamic> sales;
-  final List<dynamic> payments;
-  final List<dynamic> customers;
-  final List<dynamic> suppliers;
-  final List<dynamic> supplierPayments;
+  final List<Sale> sales;
+  final List<Payment> payments;
+  final List<Customer> customers;
+  final List<Supplier> suppliers;
+  final List<SupplierPayment> supplierPayments;
 
   @override
   Widget build(BuildContext context) {
