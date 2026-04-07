@@ -194,8 +194,17 @@ class _SupplierPaymentFormDialogState
 
   @override
   Widget build(BuildContext context) {
-    final balance =
-        _supplierId == null ? 0.0 : _balanceForSupplier(_supplierId!);
+    final supplierPurchases = _supplierId == null
+        ? 0.0
+        : widget.purchases
+            .where((purchase) => purchase.supplierId == _supplierId)
+            .fold(0.0, (sum, item) => sum + item.totalPrice);
+    final supplierPayments = _supplierId == null
+        ? 0.0
+        : widget.payments
+            .where((payment) => payment.supplierId == _supplierId)
+            .fold(0.0, (sum, item) => sum + item.amount);
+    final balance = supplierPurchases - supplierPayments;
 
     return AlertDialog(
       title: Text(widget.existing == null
@@ -226,8 +235,50 @@ class _SupplierPaymentFormDialogState
                       value == null ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
+                if (_supplierId != null)
+                  Card(
+                    margin: EdgeInsets.zero,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Supplier Summary',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Total Purchases'),
+                              Text(formatMoney(supplierPurchases)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Total Payments'),
+                              Text(formatMoney(supplierPayments)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Remaining Balance'),
+                              Text(formatMoney(balance)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (_supplierId != null) const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: _purchaseId,
+                  isExpanded: true,
                   items: [
                     for (final purchase in widget.purchases
                         .where((purchase) => purchase.supplierId == _supplierId))
@@ -235,6 +286,7 @@ class _SupplierPaymentFormDialogState
                         value: purchase.id,
                         child: Text(
                           '${formatDate(purchase.date)} • ${formatMoney(purchase.totalPrice)}',
+                          overflow: TextOverflow.ellipsis,
                         ),
                       )
                   ],
