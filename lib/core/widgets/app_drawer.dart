@@ -42,6 +42,7 @@ class AppDrawer extends ConsumerWidget {
                   onTap: () {
                     ref.read(navIndexProvider.notifier).state = index;
                     Navigator.of(context).pop();
+                    Navigator.of(context).popUntil((route) => route.isFirst);
                   },
                 );
               },
