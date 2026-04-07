@@ -94,6 +94,15 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
                       ),
                       trailing: PopupMenuButton<String>(
                         onSelected: (value) async {
+                          if (value == 'details') {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => SupplierLedgerScreen(
+                                  supplier: supplier,
+                                ),
+                              ),
+                            );
+                          }
                           if (value == 'edit') {
                             final updated = await showDialog<Supplier>(
                               context: context,
@@ -122,6 +131,10 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
                             child: Text('Balance: ${formatMoney(balance)}'),
                           ),
                           const PopupMenuDivider(),
+                          const PopupMenuItem(
+                            value: 'details',
+                            child: Text('Details'),
+                          ),
                           const PopupMenuItem(value: 'edit', child: Text('Edit')),
                           const PopupMenuItem(
                             value: 'delete',
