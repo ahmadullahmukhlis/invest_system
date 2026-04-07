@@ -44,7 +44,7 @@ class SupplierRepository {
     await _loadLocal();
 
     final initial = await _connectivity.checkConnectivity();
-    await _handleConnectivity(initial);
+    await _handleConnectivity(initial, force: true);
 
     _connectivitySub = _connectivity.onConnectivityChanged.listen(
       (result) => _handleConnectivity(result),
@@ -115,10 +115,13 @@ class SupplierRepository {
         : _database.ref('suppliers/$_currentUid');
   }
 
-  Future<void> _handleConnectivity(List<ConnectivityResult> result) async {
+  Future<void> _handleConnectivity(
+    List<ConnectivityResult> result, {
+    bool force = false,
+  }) async {
     final online = result.isNotEmpty &&
         !result.every((entry) => entry == ConnectivityResult.none);
-    if (online == _online) return;
+    if (!force && online == _online) return;
     _online = online;
 
     if (_online) {
@@ -146,6 +149,8 @@ class SupplierRepository {
     _remoteSub = _ref().onValue.listen((event) async {
       await _applyRemoteSnapshot(event.snapshot.value);
     });
+    final snapshot = await _ref().get();
+    await _applyRemoteSnapshot(snapshot.value);
   }
 
   Future<void> _stopRemoteSync() async {
