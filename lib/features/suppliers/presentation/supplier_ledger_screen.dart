@@ -1,47 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
-import '../../payments/data/payment_providers.dart';
-import '../../payments/domain/payment.dart';
-import '../../sales/data/sale_providers.dart';
-import '../../sales/domain/sale.dart';
+import '../../../core/widgets/app_drawer.dart';
+import '../../purchases/data/purchase_providers.dart';
+import '../../purchases/domain/purchase.dart';
+import '../../supplier_payments/data/supplier_payment_providers.dart';
+import '../../supplier_payments/domain/supplier_payment.dart';
 import '../../units/data/unit_providers.dart';
 import '../../units/domain/unit.dart';
-import '../domain/customer.dart';
+import '../domain/supplier.dart';
 
-class CustomerLedgerScreen extends ConsumerStatefulWidget {
-  const CustomerLedgerScreen({super.key, required this.customer});
+class SupplierLedgerScreen extends ConsumerStatefulWidget {
+  const SupplierLedgerScreen({super.key, required this.supplier});
 
-  final Customer customer;
+  final Supplier supplier;
 
   @override
-  ConsumerState<CustomerLedgerScreen> createState() =>
-      _CustomerLedgerScreenState();
+  ConsumerState<SupplierLedgerScreen> createState() =>
+      _SupplierLedgerScreenState();
 }
 
-class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
+class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
   DateTimeRange? _range;
 
   @override
   Widget build(BuildContext context) {
-    final sales = ref.watch(salesProvider).where((sale) {
-      return sale.customerId == widget.customer.id;
+    final purchases = ref.watch(purchasesProvider).where((purchase) {
+      return purchase.supplierId == widget.supplier.id;
     }).toList();
-    final payments = ref.watch(paymentsProvider).where((payment) {
-      return payment.customerId == widget.customer.id;
+    final payments = ref.watch(supplierPaymentsProvider).where((payment) {
+      return payment.supplierId == widget.supplier.id;
     }).toList();
     final units = ref.watch(unitsProvider);
 
     final entries = <_LedgerEntry>[];
-    for (final sale in sales) {
+    for (final purchase in purchases) {
       entries.add(_LedgerEntry(
-        date: sale.date,
-        type: 'Sale',
-        amount: sale.totalPrice,
-        note: sale.note,
-        isCredit: true,
+        date: purchase.date,
+        type: 'Purchase',
+        amount: purchase.totalPrice,
+        note: purchase.note,
+        isDebit: true,
       ));
     }
     for (final payment in payments) {
@@ -50,7 +50,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
         type: 'Payment',
         amount: payment.amount,
         note: payment.note,
-        isCredit: false,
+        isDebit: false,
       ));
     }
 
@@ -67,13 +67,13 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
 
     double running = 0;
     final rows = filtered.map((entry) {
-      running += entry.isCredit ? entry.amount : -entry.amount;
+      running += entry.isDebit ? entry.amount : -entry.amount;
       return entry.copyWith(runningBalance: running);
     }).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Ledger • ${widget.customer.name}'),
+        title: Text('Supplier • ${widget.supplier.name}'),
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
@@ -83,31 +83,33 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
         actions: [
           IconButton(
             onPressed: () async {
-              final created = await showDialog<Sale>(
+              final created = await showDialog<Purchase>(
                 context: context,
-                builder: (_) => _SaleForCustomerDialog(
-                  customerId: widget.customer.id,
+                builder: (_) => _PurchaseForSupplierDialog(
+                  supplierId: widget.supplier.id,
                   units: units.where((unit) => unit.isActive).toList(),
                 ),
               );
               if (created != null) {
-                await ref.read(saleRepositoryProvider).upsert(created);
+                await ref.read(purchaseRepositoryProvider).upsert(created);
               }
             },
             icon: const Icon(Icons.add_shopping_cart_outlined),
-            tooltip: 'Add Sale',
+            tooltip: 'Add Purchase',
           ),
           IconButton(
             onPressed: () async {
-              final created = await showDialog<Payment>(
+              final created = await showDialog<SupplierPayment>(
                 context: context,
-                builder: (_) => _PaymentForCustomerDialog(
-                  customerId: widget.customer.id,
-                  sales: sales,
+                builder: (_) => _PaymentForSupplierDialog(
+                  supplierId: widget.supplier.id,
+                  purchases: purchases,
                 ),
               );
               if (created != null) {
-                await ref.read(paymentRepositoryProvider).upsert(created);
+                await ref
+                    .read(supplierPaymentRepositoryProvider)
+                    .upsert(created);
               }
             },
             icon: const Icon(Icons.add_card_outlined),
@@ -145,7 +147,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
               final entry = rows[index];
               return ListTile(
                 leading: Icon(
-                  entry.isCredit
+                  entry.isDebit
                       ? Icons.arrow_upward
                       : Icons.arrow_downward,
                 ),
@@ -173,7 +175,7 @@ class _LedgerEntry {
     required this.date,
     required this.type,
     required this.amount,
-    required this.isCredit,
+    required this.isDebit,
     this.note,
     this.runningBalance = 0,
   });
@@ -181,7 +183,7 @@ class _LedgerEntry {
   final DateTime date;
   final String type;
   final double amount;
-  final bool isCredit;
+  final bool isDebit;
   final String? note;
   final double runningBalance;
 
@@ -190,27 +192,28 @@ class _LedgerEntry {
       date: date,
       type: type,
       amount: amount,
-      isCredit: isCredit,
+      isDebit: isDebit,
       note: note,
       runningBalance: runningBalance ?? this.runningBalance,
     );
   }
 }
 
-class _SaleForCustomerDialog extends StatefulWidget {
-  const _SaleForCustomerDialog({
-    required this.customerId,
+class _PurchaseForSupplierDialog extends StatefulWidget {
+  const _PurchaseForSupplierDialog({
+    required this.supplierId,
     required this.units,
   });
 
-  final String customerId;
+  final String supplierId;
   final List<Unit> units;
 
   @override
-  State<_SaleForCustomerDialog> createState() => _SaleForCustomerDialogState();
+  State<_PurchaseForSupplierDialog> createState() =>
+      _PurchaseForSupplierDialogState();
 }
 
-class _SaleForCustomerDialogState extends State<_SaleForCustomerDialog> {
+class _PurchaseForSupplierDialogState extends State<_PurchaseForSupplierDialog> {
   final _formKey = GlobalKey<FormState>();
   String? _unitId;
   DateTime _date = DateTime.now();
@@ -236,7 +239,7 @@ class _SaleForCustomerDialogState extends State<_SaleForCustomerDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Add Sale'),
+      title: const Text('Add Purchase'),
       content: SizedBox(
         width: 420,
         child: Form(
@@ -334,9 +337,9 @@ class _SaleForCustomerDialogState extends State<_SaleForCustomerDialog> {
             final total = quantity * price;
             Navigator.pop(
               context,
-              Sale(
+              Purchase(
                 id: '',
-                customerId: widget.customerId,
+                supplierId: widget.supplierId,
                 date: _date,
                 quantityValue: quantity,
                 unitId: _unitId!,
@@ -353,23 +356,23 @@ class _SaleForCustomerDialogState extends State<_SaleForCustomerDialog> {
   }
 }
 
-class _PaymentForCustomerDialog extends StatefulWidget {
-  const _PaymentForCustomerDialog({
-    required this.customerId,
-    required this.sales,
+class _PaymentForSupplierDialog extends StatefulWidget {
+  const _PaymentForSupplierDialog({
+    required this.supplierId,
+    required this.purchases,
   });
 
-  final String customerId;
-  final List<Sale> sales;
+  final String supplierId;
+  final List<Purchase> purchases;
 
   @override
-  State<_PaymentForCustomerDialog> createState() =>
-      _PaymentForCustomerDialogState();
+  State<_PaymentForSupplierDialog> createState() =>
+      _PaymentForSupplierDialogState();
 }
 
-class _PaymentForCustomerDialogState extends State<_PaymentForCustomerDialog> {
+class _PaymentForSupplierDialogState extends State<_PaymentForSupplierDialog> {
   final _formKey = GlobalKey<FormState>();
-  String? _saleId;
+  String? _purchaseId;
   DateTime _date = DateTime.now();
   final _amount = TextEditingController();
   final _note = TextEditingController();
@@ -384,7 +387,7 @@ class _PaymentForCustomerDialogState extends State<_PaymentForCustomerDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Add Payment'),
+      title: const Text('Add Supplier Payment'),
       content: SizedBox(
         width: 420,
         child: Form(
@@ -393,19 +396,19 @@ class _PaymentForCustomerDialogState extends State<_PaymentForCustomerDialog> {
             child: Column(
               children: [
                 DropdownButtonFormField<String>(
-                  value: _saleId,
+                  value: _purchaseId,
                   items: [
-                    for (final sale in widget.sales)
+                    for (final purchase in widget.purchases)
                       DropdownMenuItem(
-                        value: sale.id,
+                        value: purchase.id,
                         child: Text(
-                          '${formatDate(sale.date)} • ${formatMoney(sale.totalPrice)}',
+                          '${formatDate(purchase.date)} • ${formatMoney(purchase.totalPrice)}',
                         ),
                       )
                   ],
                   decoration:
-                      const InputDecoration(labelText: 'Sale (optional)'),
-                  onChanged: (value) => setState(() => _saleId = value),
+                      const InputDecoration(labelText: 'Purchase (optional)'),
+                  onChanged: (value) => setState(() => _purchaseId = value),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -460,10 +463,10 @@ class _PaymentForCustomerDialogState extends State<_PaymentForCustomerDialog> {
             if (!(_formKey.currentState?.validate() ?? false)) return;
             Navigator.pop(
               context,
-              Payment(
+              SupplierPayment(
                 id: '',
-                customerId: widget.customerId,
-                saleId: _saleId,
+                supplierId: widget.supplierId,
+                purchaseId: _purchaseId,
                 date: _date,
                 amount: double.parse(_amount.text),
                 note: _note.text.trim().isEmpty ? null : _note.text.trim(),

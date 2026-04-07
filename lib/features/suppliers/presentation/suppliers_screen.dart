@@ -7,6 +7,7 @@ import '../../purchases/data/purchase_providers.dart';
 import '../../supplier_payments/data/supplier_payment_providers.dart';
 import '../data/supplier_providers.dart';
 import '../domain/supplier.dart';
+import 'supplier_ledger_screen.dart';
 
 class SuppliersScreen extends ConsumerStatefulWidget {
   const SuppliersScreen({super.key});
@@ -128,6 +129,15 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
                           ),
                         ],
                       ),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => SupplierLedgerScreen(
+                              supplier: supplier,
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),
