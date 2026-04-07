@@ -5,13 +5,14 @@ import 'package:firebase_database/firebase_database.dart';
 
 import 'permissions.dart';
 import 'user_profile.dart';
+import 'firebase_config.dart';
 
 class UserRepository {
   UserRepository({
     FirebaseAuth? auth,
     FirebaseDatabase? database,
   })  : _auth = auth ?? FirebaseAuth.instance,
-        _database = database ?? FirebaseDatabase.instance;
+        _database = database ?? databaseInstance();
 
   final FirebaseAuth _auth;
   final FirebaseDatabase _database;
