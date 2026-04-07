@@ -13,6 +13,7 @@ import '../../units/domain/unit.dart';
 import '../data/purchase_providers.dart';
 import '../domain/purchase.dart';
 import 'purchase_detail_screen.dart';
+import '../../receipts/presentation/purchase_receipt_screen.dart';
 
 class PurchasesScreen extends ConsumerWidget {
   const PurchasesScreen({super.key});
@@ -116,15 +117,18 @@ class PurchasesScreen extends ConsumerWidget {
                                     );
                                     return;
                                   }
-                                  if (value == 'receipt') {
-                                    await _showReceipt(
-                                      context,
-                                      purchase,
-                                      supplierName,
-                                      unitName,
-                                    );
-                                    return;
-                                  }
+                            if (value == 'receipt') {
+                              if (context.mounted) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => PurchaseReceiptScreen(
+                                      purchase: purchase,
+                                    ),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
                                   final canEdit = await ref
                                       .read(purchaseRepositoryProvider)
                                       .canEdit(purchase.id);
@@ -401,43 +405,4 @@ Future<bool> _confirmDelete(BuildContext context) async {
     ),
   );
   return result ?? false;
-}
-
-Future<void> _showReceipt(
-  BuildContext context,
-  Purchase purchase,
-  String supplierName,
-  String unitName,
-) async {
-  await showDialog<void>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Purchase Receipt'),
-      content: SizedBox(
-        width: 360,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Supplier: $supplierName'),
-            Text('Date: ${formatDate(purchase.date)}'),
-            const Divider(),
-            Text('Quantity: ${purchase.quantityValue} $unitName'),
-            Text('Price per unit: ${formatMoney(purchase.pricePerUnit)}'),
-            Text('Total: ${formatMoney(purchase.totalPrice)}'),
-            if (purchase.note != null && purchase.note!.isNotEmpty) ...[
-              const Divider(),
-              Text('Note: ${purchase.note}'),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
-        ),
-      ],
-    ),
-  );
 }

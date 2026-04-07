@@ -13,6 +13,7 @@ import '../../units/domain/unit.dart';
 import '../data/sale_providers.dart';
 import '../domain/sale.dart';
 import 'sale_detail_screen.dart';
+import '../../receipts/presentation/sale_receipt_screen.dart';
 
 class SalesScreen extends ConsumerWidget {
   const SalesScreen({super.key});
@@ -115,11 +116,17 @@ class SalesScreen extends ConsumerWidget {
                                     );
                                     return;
                                   }
-                                  if (value == 'receipt') {
-                                    await _showReceipt(
-                                        context, sale, customerName, unitName);
-                                    return;
-                                  }
+                            if (value == 'receipt') {
+                              if (context.mounted) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        SaleReceiptScreen(sale: sale),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
                                   final canEdit = await ref
                                       .read(saleRepositoryProvider)
                                       .canEdit(sale.id);
@@ -397,43 +404,4 @@ Future<bool> _confirmDelete(BuildContext context) async {
     ),
   );
   return result ?? false;
-}
-
-Future<void> _showReceipt(
-  BuildContext context,
-  Sale sale,
-  String customerName,
-  String unitName,
-) async {
-  await showDialog<void>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Sale Receipt'),
-      content: SizedBox(
-        width: 360,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Customer: $customerName'),
-            Text('Date: ${formatDate(sale.date)}'),
-            const Divider(),
-            Text('Quantity: ${sale.quantityValue} $unitName'),
-            Text('Price per unit: ${formatMoney(sale.pricePerUnit)}'),
-            Text('Total: ${formatMoney(sale.totalPrice)}'),
-            if (sale.note != null && sale.note!.isNotEmpty) ...[
-              const Divider(),
-              Text('Note: ${sale.note}'),
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
-        ),
-      ],
-    ),
-  );
 }
