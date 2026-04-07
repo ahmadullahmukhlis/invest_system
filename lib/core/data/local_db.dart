@@ -33,6 +33,9 @@ class LocalDb {
         owner_uid TEXT NOT NULL,
         name TEXT NOT NULL,
         phone TEXT NOT NULL,
+        email TEXT NOT NULL,
+        company TEXT NOT NULL,
+        notes TEXT NOT NULL,
         province TEXT NOT NULL,
         district TEXT NOT NULL,
         address TEXT,
@@ -132,6 +135,9 @@ class LocalDb {
     await _addColumnIfMissing(db, 'customers', 'province', "TEXT NOT NULL DEFAULT ''");
     await _addColumnIfMissing(db, 'customers', 'district', "TEXT NOT NULL DEFAULT ''");
     await _addColumnIfMissing(db, 'customers', 'address', 'TEXT');
+    await _addColumnIfMissing(db, 'customers', 'email', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(db, 'customers', 'company', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(db, 'customers', 'notes', "TEXT NOT NULL DEFAULT ''");
     await _addColumnIfMissing(db, 'customers', 'deleted', 'INTEGER NOT NULL DEFAULT 0');
 
     await _addColumnIfMissing(db, 'units', 'is_active', 'INTEGER NOT NULL DEFAULT 1');
