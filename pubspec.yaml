@@ -61,3 +61,4 @@ flutter:
   assets:
     - assets/
     - assets/provinces-and-districts.json
+    - assets/about/mukhlis.jpg
