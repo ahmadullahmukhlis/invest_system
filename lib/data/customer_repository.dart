@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import 'customer.dart';
 import 'local_db.dart';
+import '../core/utils/network_utils.dart';
 import 'user_repository.dart';
 
 class CustomerRepository {
@@ -108,8 +109,7 @@ class CustomerRepository {
   }
 
   Future<void> _handleConnectivity(List<ConnectivityResult> result) async {
-    final online = result.isNotEmpty &&
-        !result.every((entry) => entry == ConnectivityResult.none);
+    final online = await hasInternetConnection(result);
     if (online == _online) return;
     _online = online;
 

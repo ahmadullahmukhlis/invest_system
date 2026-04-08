@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
+import '../core/utils/network_utils.dart';
 import 'permissions.dart';
 import 'user_profile.dart';
 import 'firebase_config.dart';
@@ -53,8 +54,15 @@ class UserRepository {
   Future<void> ensureCurrentUserProfile() async {
     final user = _auth.currentUser;
     if (user == null) return;
+    final online = await hasInternet();
+    if (!online) return;
     final ref = _usersRef().child(user.uid);
-    final snapshot = await ref.get();
+    DataSnapshot snapshot;
+    try {
+      snapshot = await ref.get().timeout(const Duration(seconds: 5));
+    } catch (_) {
+      return;
+    }
     if (snapshot.exists) {
       final email = (user.email ?? '').toLowerCase();
       if (email == superAdminEmail) {

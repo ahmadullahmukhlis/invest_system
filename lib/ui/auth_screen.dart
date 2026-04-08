@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
+import '../core/utils/network_utils.dart';
 import '../data/firebase_config.dart';
 import '../data/permissions.dart';
 import '../data/user_repository.dart';
@@ -145,6 +146,12 @@ class _AuthScreenState extends State<AuthScreen> {
     }
     if (_isRegister && name.isEmpty) {
       setState(() => _error = 'Full name is required.');
+      return;
+    }
+
+    final online = await hasInternet();
+    if (!online) {
+      setState(() => _error = 'No internet connection.');
       return;
     }
 

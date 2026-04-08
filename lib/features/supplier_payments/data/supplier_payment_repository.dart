@@ -6,6 +6,7 @@ import 'package:firebase_database/firebase_database.dart';
 
 import '../../../core/data/local_db.dart';
 import '../../../core/utils/id.dart';
+import '../../../core/utils/network_utils.dart';
 import '../../../data/firebase_config.dart';
 import '../../../data/user_repository.dart';
 import '../domain/supplier_payment.dart';
@@ -137,8 +138,7 @@ class SupplierPaymentRepository {
     List<ConnectivityResult> result, {
     bool force = false,
   }) async {
-    final online = result.isNotEmpty &&
-        !result.every((entry) => entry == ConnectivityResult.none);
+    final online = await hasInternetConnection(result);
     if (!force && online == _online) return;
     _online = online;
 
