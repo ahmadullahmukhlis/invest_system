@@ -9,39 +9,6 @@ on:
       - "v*"
 
 jobs:
-  linux-deb:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            clang \
-            cmake \
-            ninja-build \
-            pkg-config \
-            libgtk-3-dev \
-            liblzma-dev
-      - name: Enable Linux desktop
-        run: flutter config --enable-linux-desktop
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Generate launcher icons
-        run: flutter pub run flutter_launcher_icons
-      - name: Install fastforge
-        run: dart pub global activate fastforge
-      - name: Package DEB
-        run: dart pub global run fastforge:main package --platform linux --targets deb
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-deb
-          path: dist/**
-
   windows-exe:
     runs-on: windows-latest
     steps:
@@ -90,7 +57,7 @@ jobs:
           path: dist/**
 
   publish-release:
-    needs: [linux-deb, windows-exe, macos-pkg]
+    needs: [windows-exe, macos-pkg]
     runs-on: ubuntu-latest
     permissions:
       contents: write
