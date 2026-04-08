@@ -7,6 +7,7 @@ import '../../features/payments/presentation/payments_screen.dart';
 import '../../features/purchases/presentation/purchases_screen.dart';
 import '../../features/reports/presentation/reports_screen.dart';
 import '../../features/sales/presentation/sales_screen.dart';
+import '../../features/settings/presentation/about_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/suppliers/presentation/suppliers_screen.dart';
 import '../../features/supplier_payments/presentation/supplier_payments_screen.dart';
@@ -32,6 +33,7 @@ class AppShell extends ConsumerWidget {
       if (_isVisible(visibleNavItems, 'reports')) const ReportsScreen(),
       if (_isVisible(visibleNavItems, 'units')) const UnitsScreen(),
       if (_isVisible(visibleNavItems, 'settings')) const SettingsScreen(),
+      const AboutScreen(),
     ];
     final safeIndex = index.clamp(0, screens.length - 1);
 

@@ -27,6 +27,7 @@ const navItems = <NavItem>[
   NavItem('Reports', Icons.assessment_outlined, module: 'reports'),
   NavItem('Units', Icons.scale_outlined, module: 'units'),
   NavItem('Settings', Icons.settings_outlined, module: 'settings'),
+  NavItem('Contact Us', Icons.contact_mail_outlined),
 ];
 
 final navIndexProvider = StateProvider<int>((ref) => 0);

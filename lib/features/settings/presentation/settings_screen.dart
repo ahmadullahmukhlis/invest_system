@@ -39,7 +39,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final canManageUsers =
         currentRole == 'admin' || currentRole == 'super_admin';
     final canAssignSuper = currentRole == 'super_admin';
-    final canSync = currentRole == 'super_admin' ||
+    final canSync =
+        currentRole == 'super_admin' ||
         (userRepo.current?.permissions['sync']?.view ?? false);
 
     return DesktopScaffold(
@@ -60,8 +61,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Data Sync',
-                        style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      'Data Sync',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     const SizedBox(height: 8),
                     const Text(
                       'Sync local SQLite and Firebase Realtime Database.',
@@ -95,8 +98,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content:
-                                            Text('Pushed local data to server.'),
+                                        content: Text(
+                                          'Pushed local data to server.',
+                                        ),
                                       ),
                                     );
                                   }
@@ -112,8 +116,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content:
-                                            Text('Pulled server data to SQLite.'),
+                                        content: Text(
+                                          'Pulled server data to SQLite.',
+                                        ),
                                       ),
                                     );
                                   }
@@ -201,7 +206,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 16),
             ],
-            const SizedBox(height: 16),
             const SectionHeader(
               title: 'Account',
               subtitle: 'Security and session',
@@ -233,7 +237,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }) {
     final roleValue = _roles.contains(user.role) ? user.role : 'viewer';
     final canEditRole =
-        userRepo.currentRole == 'super_admin' || userRepo.currentRole == 'admin';
+        userRepo.currentRole == 'super_admin' ||
+        userRepo.currentRole == 'admin';
     final canEditSuper = canAssignSuper || user.role != 'super_admin';
     final canToggleSync = canEditRole && canEditSuper;
 
@@ -277,10 +282,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: !canToggleSync
                 ? null
                 : (value) async {
-                    final updated =
-                        Map<String, PermissionSet>.from(user.permissions);
+                    final updated = Map<String, PermissionSet>.from(
+                      user.permissions,
+                    );
                     final current =
-                        updated['sync'] ?? PermissionSet(view: false, create: false, edit: false, remove: false);
+                        updated['sync'] ??
+                        PermissionSet(
+                          view: false,
+                          create: false,
+                          edit: false,
+                          remove: false,
+                        );
                     updated['sync'] = current.copyWith(view: value);
                     await userRepo.updateUserPermissions(user.uid, updated);
                   },
@@ -386,8 +398,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         decoration: const InputDecoration(labelText: 'Name'),
                         validator: (value) =>
                             value == null || value.trim().isEmpty
-                                ? 'Required'
-                                : null,
+                            ? 'Required'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -396,18 +408,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) =>
                             value == null || value.trim().isEmpty
-                                ? 'Required'
-                                : null,
+                            ? 'Required'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: passwordController,
-                        decoration: const InputDecoration(labelText: 'Password'),
+                        decoration: const InputDecoration(
+                          labelText: 'Password',
+                        ),
                         obscureText: true,
-                        validator: (value) =>
-                            value == null || value.length < 6
-                                ? 'Minimum 6 characters'
-                                : null,
+                        validator: (value) => value == null || value.length < 6
+                            ? 'Minimum 6 characters'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
@@ -454,9 +467,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             if (context.mounted) {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('User created.'),
-                                ),
+                                const SnackBar(content: Text('User created.')),
                               );
                             }
                           } catch (e) {
@@ -552,11 +563,7 @@ class _PermissionRowState extends State<_PermissionRow> {
             children: [
               label,
               const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: switches,
-              ),
+              Wrap(spacing: 6, runSpacing: 6, children: switches),
             ],
           );
         }
@@ -570,11 +577,7 @@ class _PermissionRowState extends State<_PermissionRow> {
     );
   }
 
-  Widget _permSwitch(
-    String label,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) {
+  Widget _permSwitch(String label, bool value, ValueChanged<bool> onChanged) {
     return SizedBox(
       width: 56,
       child: Column(
@@ -583,10 +586,7 @@ class _PermissionRowState extends State<_PermissionRow> {
           Text(label, style: const TextStyle(fontSize: 11)),
           Transform.scale(
             scale: 0.8,
-            child: Switch(
-              value: value,
-              onChanged: onChanged,
-            ),
+            child: Switch(value: value, onChanged: onChanged),
           ),
         ],
       ),
