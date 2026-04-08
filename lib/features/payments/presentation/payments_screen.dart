@@ -12,6 +12,7 @@ import '../../sales/data/sale_providers.dart';
 import '../../sales/domain/sale.dart';
 import '../data/payment_providers.dart';
 import '../domain/payment.dart';
+import 'payment_detail_screen.dart';
 
 class PaymentsScreen extends ConsumerWidget {
   const PaymentsScreen({super.key});
@@ -164,6 +165,15 @@ class PaymentsScreen extends ConsumerWidget {
                                   PopupMenuItem(value: 'delete', child: Text('Delete')),
                                 ],
                               ),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => PaymentDetailScreen(
+                                      payment: payment,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           );
                         },
