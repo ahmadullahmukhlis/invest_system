@@ -58,7 +58,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     required List<_CustomerReportRow> rows,
   }) async {
     final excel = Excel.createExcel();
-    final sheet = excel['Customers'];
+
+    final defaultSheet = excel.getDefaultSheet();
+    final sheet = excel[defaultSheet!];
+    excel.rename(defaultSheet, "Customers");
+
+    // Add headers
     sheet.appendRow([
       TextCellValue('Customer'),
       TextCellValue('Phone'),
@@ -71,6 +76,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       TextCellValue('Total Payments'),
       TextCellValue('Balance'),
     ]);
+
+    // Add data rows
     for (final row in rows) {
       sheet.appendRow([
         TextCellValue(row.name),
@@ -87,14 +94,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     }
 
     final bytes = excel.encode();
-    if (bytes == null) return;
-    final dir = await getTemporaryDirectory();
+    if (bytes == null) {
+      print("❌ Excel encoding failed");
+      return;
+    }
+
+    final dir = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/customer_report.xlsx');
+
     await file.writeAsBytes(bytes, flush: true);
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: 'Customer report',
-    );
+    await Share.shareXFiles([XFile(file.path)], text: 'Customer Report');
   }
 
   @override
