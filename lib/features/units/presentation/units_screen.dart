@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_drawer.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
@@ -67,8 +68,8 @@ class UnitsScreen extends ConsumerWidget {
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: (unit.isActive
-                                      ? Colors.green
-                                      : Colors.grey)
+                                      ? AppColors.success
+                                      : AppColors.muted)
                                   .withOpacity(0.12),
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -76,7 +77,9 @@ class UnitsScreen extends ConsumerWidget {
                               unit.isActive
                                   ? Icons.check_circle_outline
                                   : Icons.pause_circle_outline,
-                              color: unit.isActive ? Colors.green : Colors.grey,
+                              color: unit.isActive
+                                  ? AppColors.success
+                                  : AppColors.muted,
                               size: 18,
                             ),
                           ),

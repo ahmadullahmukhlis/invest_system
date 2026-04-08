@@ -88,7 +88,7 @@ class DashboardScreen extends ConsumerWidget {
                     value: formatMoney(totalSalesToday),
                     subtitle: 'Total: ${formatMoney(totalSales)}',
                     icon: Icons.trending_up,
-                    color: AppColors.accent,
+                    color: AppColors.indigo,
                   ),
                   _MetricData(
                     title: 'Today\'s Purchases',
@@ -102,28 +102,28 @@ class DashboardScreen extends ConsumerWidget {
                     value: formatMoney(totalPaymentsReceivedToday),
                     subtitle: 'Total: ${formatMoney(totalPaymentsReceived)}',
                     icon: Icons.arrow_downward,
-                    color: AppColors.success,
+                    color: AppColors.indigo,
                   ),
                   _MetricData(
                     title: 'Cash Paid',
                     value: formatMoney(totalPaymentsPaidToday),
                     subtitle: 'Total: ${formatMoney(totalPaymentsPaid)}',
                     icon: Icons.arrow_upward,
-                    color: AppColors.danger,
+                    color: AppColors.indigo,
                   ),
                   _MetricData(
                     title: 'Receivables',
                     value: formatMoney(totalCustomerBalance),
                     subtitle: 'From customers',
                     icon: Icons.people,
-                    color: AppColors.amber,
+                    color: AppColors.indigo,
                   ),
                   _MetricData(
                     title: 'Payables',
                     value: formatMoney(totalSupplierBalance),
                     subtitle: 'To suppliers',
                     icon: Icons.business,
-                    color: AppColors.muted,
+                    color: AppColors.indigo,
                   ),
                 ];
                 return Wrap(
@@ -155,7 +155,7 @@ class DashboardScreen extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                   child: Row(
                     children: [
-                      Icon(Icons.emoji_events, color: AppColors.accent, size: 24),
+                      Icon(Icons.emoji_events, color: AppColors.indigo, size: 24),
                       const SizedBox(width: 12),
                       Text(
                         'Top Customers',
@@ -249,86 +249,69 @@ class _MetricCard extends StatelessWidget {
         final valueSize = isCompact ? 18.0 : 24.0;
         final iconSize = isCompact ? 18.0 : 20.0;
         return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white,
-                  color.withOpacity(0.05),
-                ],
-              ),
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(padding),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(icon, color: color, size: iconSize),
+          child: Padding(
+            padding: EdgeInsets.all(padding),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      if (!isCompact)
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                    ],
-                  ),
-                  SizedBox(height: isCompact ? 6 : 12),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      value,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                        fontSize: valueSize,
-                      ),
-                      maxLines: 1,
+                      child: Icon(icon, color: color, size: iconSize),
                     ),
+                    if (!isCompact)
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                  ],
+                ),
+                SizedBox(height: isCompact ? 6 : 12),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                      fontSize: valueSize,
+                    ),
+                    maxLines: 1,
                   ),
-                  const SizedBox(height: 4),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (!isCompact) ...[
+                  const SizedBox(height: 2),
                   Text(
-                    title,
+                    subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.muted,
                     ),
                   ),
-                  if (!isCompact) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.muted,
-                      ),
-                    ),
-                  ],
                 ],
-              ),
+              ],
             ),
           ),
         );
@@ -366,10 +349,6 @@ class _TopCustomersCard extends StatelessWidget {
     }
 
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
       child: Column(
         children: [
           for (int i = 0; i < topCustomers.length; i++)
@@ -398,9 +377,11 @@ class _TopCustomersCard extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          border: isLast ? null : Border(
-            bottom: BorderSide(color: Colors.grey.withOpacity(0.15)),
-          ),
+          border: isLast
+              ? null
+              : Border(
+                  bottom: BorderSide(color: AppColors.muted.withOpacity(0.15)),
+                ),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -410,14 +391,14 @@ class _TopCustomersCard extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: rank <= 3 ? AppColors.accent : AppColors.muted,
+                  color: AppColors.indigo,
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
                     '$rank',
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppColors.card,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -629,10 +610,6 @@ class _RecentTransactionsCard extends StatelessWidget {
     }
 
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
       child: Column(
         children: allTransactions,
       ),
@@ -668,7 +645,7 @@ class _TransactionTile extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: Colors.grey.withOpacity(0.15)),
+            bottom: BorderSide(color: AppColors.muted.withOpacity(0.15)),
           ),
         ),
         child: Padding(
