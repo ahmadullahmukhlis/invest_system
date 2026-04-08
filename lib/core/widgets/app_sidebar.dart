@@ -81,6 +81,10 @@ class AppSidebar extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(12),
                         onTap: () {
                           ref.read(navIndexProvider.notifier).state = index;
+                          if (Navigator.of(context).canPop()) {
+                            Navigator.of(context)
+                                .popUntil((route) => route.isFirst);
+                          }
                         },
                         child: Padding(
                           padding: const EdgeInsets.symmetric(

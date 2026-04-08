@@ -1,0 +1,108 @@
+name: Build Installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+
+jobs:
+  linux-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgtk-3-dev \
+            liblzma-dev
+      - name: Enable Linux desktop
+        run: flutter config --enable-linux-desktop
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Generate launcher icons
+        run: flutter pub run flutter_launcher_icons
+      - name: Install fastforge
+        run: dart pub global activate fastforge
+      - name: Package DEB
+        run: dart pub global run fastforge:main package --platform linux --targets deb
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: dist/**
+
+  windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Generate launcher icons
+        run: flutter pub run flutter_launcher_icons
+      - name: Install fastforge
+        run: dart pub global activate fastforge
+      - name: Package EXE
+        shell: bash
+        run: dart pub global run fastforge:main package --platform windows --targets exe
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: dist/**
+
+  macos-pkg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Enable macOS desktop
+        run: flutter config --enable-macos-desktop
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Generate launcher icons
+        run: flutter pub run flutter_launcher_icons
+      - name: Install fastforge
+        run: dart pub global activate fastforge
+      - name: Package PKG
+        run: dart pub global run fastforge:main package --platform macos --targets pkg
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-pkg
+          path: dist/**
+
+  publish-release:
+    needs: [linux-deb, windows-exe, macos-pkg]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          prerelease: true
+          body_path: release-notes.md
+          files: dist-artifacts/**/*
