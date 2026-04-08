@@ -19,22 +19,32 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(navIndexProvider);
-    final screens = const <Widget>[
-      DashboardScreen(),
-      CustomersScreen(),
-      SuppliersScreen(),
-      SalesScreen(),
-      PaymentsScreen(),
-      PurchasesScreen(),
-      SupplierPaymentsScreen(),
-      ReportsScreen(),
-      UnitsScreen(),
-      SettingsScreen(),
+    final visibleNavItems = ref.watch(visibleNavItemsProvider);
+    final screens = <Widget>[
+      const DashboardScreen(),
+      if (_isVisible(visibleNavItems, 'customers')) const CustomersScreen(),
+      if (_isVisible(visibleNavItems, 'suppliers')) const SuppliersScreen(),
+      if (_isVisible(visibleNavItems, 'sales')) const SalesScreen(),
+      if (_isVisible(visibleNavItems, 'payments')) const PaymentsScreen(),
+      if (_isVisible(visibleNavItems, 'purchases')) const PurchasesScreen(),
+      if (_isVisible(visibleNavItems, 'supplier_payments'))
+        const SupplierPaymentsScreen(),
+      if (_isVisible(visibleNavItems, 'reports')) const ReportsScreen(),
+      if (_isVisible(visibleNavItems, 'units')) const UnitsScreen(),
+      if (_isVisible(visibleNavItems, 'settings')) const SettingsScreen(),
     ];
+    final safeIndex = index.clamp(0, screens.length - 1);
 
-    return IndexedStack(
-      index: index,
-      children: screens,
-    );
+    if (safeIndex != index) {
+      Future.microtask(() {
+        ref.read(navIndexProvider.notifier).state = safeIndex;
+      });
+    }
+
+    return IndexedStack(index: safeIndex, children: screens);
   }
+}
+
+bool _isVisible(List<NavItem> items, String module) {
+  return items.any((item) => item.module == module);
 }

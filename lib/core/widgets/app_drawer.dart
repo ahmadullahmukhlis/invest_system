@@ -10,6 +10,7 @@ class AppDrawer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedIndex = ref.watch(navIndexProvider);
+    final items = ref.watch(visibleNavItemsProvider);
 
     return Drawer(
       child: SafeArea(
@@ -25,8 +26,10 @@ class AppDrawer extends ConsumerWidget {
                       color: AppColors.indigo.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.inventory_2_outlined,
-                        color: AppColors.indigo),
+                    child: const Icon(
+                      Icons.inventory_2_outlined,
+                      color: AppColors.indigo,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -35,17 +38,14 @@ class AppDrawer extends ConsumerWidget {
                       children: [
                         Text(
                           'Bulk Sales',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
+                          style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           'Accounting System',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.muted,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.muted),
                         ),
                       ],
                     ),
@@ -56,9 +56,9 @@ class AppDrawer extends ConsumerWidget {
             const Divider(height: 16),
             Expanded(
               child: ListView.builder(
-                itemCount: navItems.length,
+                itemCount: items.length,
                 itemBuilder: (context, index) {
-                  final item = navItems[index];
+                  final item = items[index];
                   final selected = index == selectedIndex;
                   return ListTile(
                     leading: Icon(
@@ -69,7 +69,9 @@ class AppDrawer extends ConsumerWidget {
                       item.label,
                       style: TextStyle(
                         color: selected ? AppColors.indigo : null,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                       ),
                     ),
                     selected: selected,

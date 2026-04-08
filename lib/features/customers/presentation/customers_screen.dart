@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/desktop_table.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
+import '../../../data/user_providers.dart';
 import '../../../ui/responsive.dart';
 import 'customer_form_dialog.dart';
 import '../../payments/data/payment_providers.dart';
@@ -27,9 +29,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userRepo = ref.watch(userRepositoryProvider);
     final customers = ref.watch(customersProvider);
     final sales = ref.watch(salesProvider);
     final payments = ref.watch(paymentsProvider);
+    final canCreateCustomer = canCreate(userRepo, 'customers');
+    final canEditCustomer = canEdit(userRepo, 'customers');
+    final canDeleteCustomer = canRemove(userRepo, 'customers');
 
     final filtered = customers.where((customer) {
       final q = _query.toLowerCase();
@@ -44,19 +50,20 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     return DesktopScaffold(
       title: 'Customers',
       actions: [
-        IconButton(
-          onPressed: () async {
-            final created = await showDialog<Customer>(
-              context: context,
-              builder: (context) => const CustomerFormDialog(),
-            );
-            if (created != null) {
-              await ref.read(customerRepositoryProvider).upsert(created);
-            }
-          },
-          icon: const Icon(Icons.person_add_alt_1_outlined),
-          tooltip: 'Add customer',
-        ),
+        if (canCreateCustomer)
+          IconButton(
+            onPressed: () async {
+              final created = await showDialog<Customer>(
+                context: context,
+                builder: (context) => const CustomerFormDialog(),
+              );
+              if (created != null) {
+                await ref.read(customerRepositoryProvider).upsert(created);
+              }
+            },
+            icon: const Icon(Icons.person_add_alt_1_outlined),
+            tooltip: 'Add customer',
+          ),
       ],
       body: RefreshWrapper(
         child: ListView(
@@ -98,6 +105,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                       customer: customer,
                       sales: sales,
                       payments: payments,
+                      canEditCustomer: canEditCustomer,
+                      canDeleteCustomer: canDeleteCustomer,
                     ),
                 ],
               )
@@ -111,6 +120,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                       customer: customer,
                       sales: sales,
                       payments: payments,
+                      canEditCustomer: canEditCustomer,
+                      canDeleteCustomer: canDeleteCustomer,
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -128,6 +139,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     required Customer customer,
     required List sales,
     required List payments,
+    required bool canEditCustomer,
+    required bool canDeleteCustomer,
   }) {
     final customerSales = sales
         .where((sale) => sale.customerId == customer.id)
@@ -146,7 +159,13 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         DataCell(
           Align(
             alignment: Alignment.centerLeft,
-            child: _buildActionsMenu(context, ref, customer),
+            child: _buildActionsMenu(
+              context,
+              ref,
+              customer,
+              canEditCustomer: canEditCustomer,
+              canDeleteCustomer: canDeleteCustomer,
+            ),
           ),
         ),
       ],
@@ -166,6 +185,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     required Customer customer,
     required List sales,
     required List payments,
+    required bool canEditCustomer,
+    required bool canDeleteCustomer,
   }) {
     final customerSales = sales
         .where((sale) => sale.customerId == customer.id)
@@ -184,12 +205,16 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             Text(
               '${customer.phone} • ${customer.province}, ${customer.district}',
             ),
-            Text(
-              'Balance: ${formatMoney(balance)}',
-            ),
+            Text('Balance: ${formatMoney(balance)}'),
           ],
         ),
-        trailing: _buildActionsMenu(context, ref, customer),
+        trailing: _buildActionsMenu(
+          context,
+          ref,
+          customer,
+          canEditCustomer: canEditCustomer,
+          canDeleteCustomer: canDeleteCustomer,
+        ),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -204,20 +229,19 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   Widget _buildActionsMenu(
     BuildContext context,
     WidgetRef ref,
-    Customer customer,
-  ) {
+    Customer customer, {
+    required bool canEditCustomer,
+    required bool canDeleteCustomer,
+  }) {
+    if (!canEditCustomer && !canDeleteCustomer) {
+      return const SizedBox.shrink();
+    }
+
     return PopupMenuButton<String>(
       onSelected: (value) async {
-        if (value == 'details') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => CustomerLedgerScreen(customer: customer),
-            ),
-          );
-          return;
-        }
-        final canEdit =
-            await ref.read(customerRepositoryProvider).canEdit(customer.id);
+        final canEdit = await ref
+            .read(customerRepositoryProvider)
+            .canEdit(customer.id);
         if (!canEdit) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -244,21 +268,15 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
           }
         }
       },
-      itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: 'details',
-          child: Text('Details'),
-        ),
-        PopupMenuItem(value: 'edit', child: Text('Edit')),
-        PopupMenuItem(
-          value: 'delete',
-          child: Text('Delete'),
-        ),
+      itemBuilder: (_) => [
+        if (canEditCustomer)
+          const PopupMenuItem(value: 'edit', child: Text('Edit')),
+        if (canDeleteCustomer)
+          const PopupMenuItem(value: 'delete', child: Text('Delete')),
       ],
     );
   }
 }
-
 
 Future<bool> _confirmDelete(BuildContext context) async {
   final result = await showDialog<bool>(

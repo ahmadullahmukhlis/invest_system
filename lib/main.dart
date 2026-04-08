@@ -39,7 +39,9 @@ Future<void> main() async {
   }
   final initResult = await _initFirebase();
   if (!initResult.ok) {
-    runApp(InvestSystemApp(home: FirebaseSetupScreen(message: initResult.message)));
+    runApp(
+      InvestSystemApp(home: FirebaseSetupScreen(message: initResult.message)),
+    );
     return;
   }
   runApp(const AppBootstrap());
@@ -55,9 +57,7 @@ class _FirebaseInitResult {
 Future<_FirebaseInitResult> _initFirebase() async {
   try {
     if (kIsWeb) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.web,
-      );
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
       return const _FirebaseInitResult(ok: true);
     }
 
@@ -67,14 +67,10 @@ Future<_FirebaseInitResult> _initFirebase() async {
         await Firebase.initializeApp();
         return const _FirebaseInitResult(ok: true);
       case TargetPlatform.macOS:
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.macos,
-        );
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.macos);
         return const _FirebaseInitResult(ok: true);
       case TargetPlatform.windows:
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.windows,
-        );
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.windows);
         return const _FirebaseInitResult(ok: true);
       case TargetPlatform.linux:
         return const _FirebaseInitResult(
@@ -119,16 +115,21 @@ class _AppBootstrapState extends State<AppBootstrap> {
 
   Future<void> _initAll() async {
     final userRepository = UserRepository();
-    final customerRepository =
-        CustomerRepository(userRepository: userRepository);
-    final supplierRepository =
-        SupplierRepository(userRepository: userRepository);
+    final customerRepository = CustomerRepository(
+      userRepository: userRepository,
+    );
+    final supplierRepository = SupplierRepository(
+      userRepository: userRepository,
+    );
     final unitRepository = UnitRepository(userRepository: userRepository);
     final saleRepository = SaleRepository(userRepository: userRepository);
     final paymentRepository = PaymentRepository(userRepository: userRepository);
-    final purchaseRepository = PurchaseRepository(userRepository: userRepository);
-    final supplierPaymentRepository =
-        SupplierPaymentRepository(userRepository: userRepository);
+    final purchaseRepository = PurchaseRepository(
+      userRepository: userRepository,
+    );
+    final supplierPaymentRepository = SupplierPaymentRepository(
+      userRepository: userRepository,
+    );
 
     _userRepository = userRepository;
     _customerRepository = customerRepository;
@@ -212,20 +213,26 @@ class _AppBootstrapState extends State<AppBootstrap> {
             return ProviderScope(
               overrides: [
                 userRepositoryProvider.overrideWithValue(_userRepository!),
-                customerRepositoryProvider
-                    .overrideWithValue(_customerRepository!),
-                supplierRepositoryProvider
-                    .overrideWithValue(_supplierRepository!),
+                customerRepositoryProvider.overrideWithValue(
+                  _customerRepository!,
+                ),
+                supplierRepositoryProvider.overrideWithValue(
+                  _supplierRepository!,
+                ),
                 unitRepositoryProvider.overrideWithValue(_unitRepository!),
                 saleRepositoryProvider.overrideWithValue(_saleRepository!),
-                paymentRepositoryProvider
-                    .overrideWithValue(_paymentRepository!),
-                purchaseRepositoryProvider
-                    .overrideWithValue(_purchaseRepository!),
-                supplierPaymentRepositoryProvider
-                    .overrideWithValue(_supplierPaymentRepository!),
+                paymentRepositoryProvider.overrideWithValue(
+                  _paymentRepository!,
+                ),
+                purchaseRepositoryProvider.overrideWithValue(
+                  _purchaseRepository!,
+                ),
+                supplierPaymentRepositoryProvider.overrideWithValue(
+                  _supplierPaymentRepository!,
+                ),
                 syncServiceProvider.overrideWithValue(
                   SyncService(
+                    userRepository: _userRepository!,
                     customers: _customerRepository!,
                     suppliers: _supplierRepository!,
                     units: _unitRepository!,

@@ -2,19 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
 import '../../../core/widgets/info_row.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/user_providers.dart';
 import '../../purchases/data/purchase_providers.dart';
 import '../../purchases/domain/purchase.dart';
 import '../../supplier_payments/data/supplier_payment_providers.dart';
 import '../../supplier_payments/domain/supplier_payment.dart';
 import '../../units/data/unit_providers.dart';
 import '../../units/domain/unit.dart';
-import '../data/supplier_repository.dart';
 import '../data/supplier_providers.dart';
 import '../domain/supplier.dart';
 import 'supplier_form_dialog.dart';
@@ -34,6 +35,7 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userRepo = ref.watch(userRepositoryProvider);
     final purchases = ref.watch(purchasesProvider).where((purchase) {
       return purchase.supplierId == widget.supplier.id;
     }).toList();
@@ -44,22 +46,26 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
 
     final entries = <_LedgerEntry>[];
     for (final purchase in purchases) {
-      entries.add(_LedgerEntry(
-        date: purchase.date,
-        type: 'Purchase',
-        amount: purchase.totalPrice,
-        note: purchase.note,
-        isDebit: true,
-      ));
+      entries.add(
+        _LedgerEntry(
+          date: purchase.date,
+          type: 'Purchase',
+          amount: purchase.totalPrice,
+          note: purchase.note,
+          isDebit: true,
+        ),
+      );
     }
     for (final payment in payments) {
-      entries.add(_LedgerEntry(
-        date: payment.date,
-        type: 'Payment',
-        amount: payment.amount,
-        note: payment.note,
-        isDebit: false,
-      ));
+      entries.add(
+        _LedgerEntry(
+          date: payment.date,
+          type: 'Payment',
+          amount: payment.amount,
+          note: payment.note,
+          isDebit: false,
+        ),
+      );
     }
 
     entries.sort((a, b) => a.date.compareTo(b.date));
@@ -67,10 +73,10 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
     final filtered = _range == null
         ? entries
         : entries.where((entry) {
-            return entry.date.isAfter(_range!.start
-                    .subtract(const Duration(days: 1))) &&
-                entry.date.isBefore(
-                    _range!.end.add(const Duration(days: 1)));
+            return entry.date.isAfter(
+                  _range!.start.subtract(const Duration(days: 1)),
+                ) &&
+                entry.date.isBefore(_range!.end.add(const Duration(days: 1)));
           }).toList();
 
     double running = 0;
@@ -79,11 +85,16 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
       return entry.copyWith(runningBalance: running);
     }).toList();
 
-    final totalPurchases =
-        purchases.fold(0.0, (sum, item) => sum + item.totalPrice);
-    final totalPayments =
-        payments.fold(0.0, (sum, item) => sum + item.amount);
+    final totalPurchases = purchases.fold(
+      0.0,
+      (sum, item) => sum + item.totalPrice,
+    );
+    final totalPayments = payments.fold(0.0, (sum, item) => sum + item.amount);
     final balance = totalPurchases - totalPayments;
+    final canEditSupplier = canEdit(userRepo, 'suppliers');
+    final canDeleteSupplier = canRemove(userRepo, 'suppliers');
+    final canCreatePurchase = canCreate(userRepo, 'purchases');
+    final canCreateSupplierPayment = canCreate(userRepo, 'supplier_payments');
     final lastPurchaseDate = purchases.isEmpty
         ? null
         : (purchases..sort((a, b) => b.date.compareTo(a.date))).first.date;
@@ -94,23 +105,22 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
     return DesktopScaffold(
       title: 'Supplier • ${widget.supplier.name}',
       actions: [
+        if (canEditSupplier)
           FutureBuilder<bool>(
-            future:
-                ref.read(supplierRepositoryProvider).canEdit(widget.supplier.id),
+            future: ref
+                .read(supplierRepositoryProvider)
+                .canEdit(widget.supplier.id),
             builder: (context, snapshot) {
               if (snapshot.data != true) return const SizedBox.shrink();
               return IconButton(
                 onPressed: () async {
                   final updated = await showDialog<Supplier>(
                     context: context,
-                    builder: (context) => SupplierFormDialog(
-                      existing: widget.supplier,
-                    ),
+                    builder: (context) =>
+                        SupplierFormDialog(existing: widget.supplier),
                   );
                   if (updated != null) {
-                    await ref
-                        .read(supplierRepositoryProvider)
-                        .upsert(updated);
+                    await ref.read(supplierRepositoryProvider).upsert(updated);
                   }
                 },
                 icon: const Icon(Icons.edit_outlined),
@@ -118,9 +128,11 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
               );
             },
           ),
+        if (canDeleteSupplier)
           FutureBuilder<bool>(
-            future:
-                ref.read(supplierRepositoryProvider).canEdit(widget.supplier.id),
+            future: ref
+                .read(supplierRepositoryProvider)
+                .canEdit(widget.supplier.id),
             builder: (context, snapshot) {
               if (snapshot.data != true) return const SizedBox.shrink();
               return IconButton(
@@ -138,6 +150,7 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
               );
             },
           ),
+        if (canCreatePurchase)
           IconButton(
             onPressed: () async {
               final created = await showDialog<Purchase>(
@@ -154,6 +167,7 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
             icon: const Icon(Icons.add_shopping_cart_outlined),
             tooltip: 'Add Purchase',
           ),
+        if (canCreateSupplierPayment)
           IconButton(
             onPressed: () async {
               final created = await showDialog<SupplierPayment>(
@@ -172,152 +186,161 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
             icon: const Icon(Icons.add_card_outlined),
             tooltip: 'Add Payment',
           ),
-          TextButton.icon(
-            onPressed: () async {
-              final picked = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2100),
-              );
-              if (picked != null) {
-                setState(() => _range = picked);
-              }
-            },
-            icon: const Icon(Icons.date_range_outlined),
-            label: const Text('Filter'),
+        TextButton.icon(
+          onPressed: () async {
+            final picked = await showDateRangePicker(
+              context: context,
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2100),
+            );
+            if (picked != null) {
+              setState(() => _range = picked);
+            }
+          },
+          icon: const Icon(Icons.date_range_outlined),
+          label: const Text('Filter'),
+        ),
+        if (_range != null)
+          IconButton(
+            onPressed: () => setState(() => _range = null),
+            icon: const Icon(Icons.clear),
           ),
-          if (_range != null)
-            IconButton(
-              onPressed: () => setState(() => _range = null),
-              icon: const Icon(Icons.clear),
-            ),
-        ],
+      ],
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: RefreshWrapper(
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
-            const SectionHeader(
-              title: 'Supplier Overview',
-              subtitle: 'Summary and recent activity',
-              icon: Icons.storefront_outlined,
-            ),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Supplier Info',
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    InfoRow(label: 'Name', value: widget.supplier.name),
-                    InfoRow(label: 'Phone', value: widget.supplier.phone),
-                    InfoRow(
-                      label: 'Location',
-                      value:
-                          '${widget.supplier.province}, ${widget.supplier.district}',
-                    ),
-                    if (widget.supplier.address != null &&
-                        widget.supplier.address!.isNotEmpty)
-                      InfoRow(
-                        label: 'Address',
-                        value: widget.supplier.address!,
+              const SectionHeader(
+                title: 'Supplier Overview',
+                subtitle: 'Summary and recent activity',
+                icon: Icons.storefront_outlined,
+              ),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Supplier Info',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                    const Divider(height: 24),
-                    Text('Account Summary',
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    InfoRow(
+                      const SizedBox(height: 8),
+                      InfoRow(label: 'Name', value: widget.supplier.name),
+                      InfoRow(label: 'Phone', value: widget.supplier.phone),
+                      InfoRow(
+                        label: 'Location',
+                        value:
+                            '${widget.supplier.province}, ${widget.supplier.district}',
+                      ),
+                      if (widget.supplier.address != null &&
+                          widget.supplier.address!.isNotEmpty)
+                        InfoRow(
+                          label: 'Address',
+                          value: widget.supplier.address!,
+                        ),
+                      const Divider(height: 24),
+                      Text(
+                        'Account Summary',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      InfoRow(
                         label: 'Total Purchases',
-                        value: formatMoney(totalPurchases)),
-                    InfoRow(
+                        value: formatMoney(totalPurchases),
+                      ),
+                      InfoRow(
                         label: 'Total Payments',
-                        value: formatMoney(totalPayments)),
-                    InfoRow(
-                      label: 'Remaining Balance',
-                      value: formatMoney(balance),
-                      highlight: true,
-                    ),
-                    if (lastPurchaseDate != null)
-                      InfoRow(
-                        label: 'Last Purchase',
-                        value: formatDate(lastPurchaseDate),
+                        value: formatMoney(totalPayments),
                       ),
-                    if (lastPaymentDate != null)
                       InfoRow(
-                        label: 'Last Payment',
-                        value: formatDate(lastPaymentDate),
+                        label: 'Remaining Balance',
+                        value: formatMoney(balance),
+                        highlight: true,
                       ),
-                  ],
+                      if (lastPurchaseDate != null)
+                        InfoRow(
+                          label: 'Last Purchase',
+                          value: formatDate(lastPurchaseDate),
+                        ),
+                      if (lastPaymentDate != null)
+                        InfoRow(
+                          label: 'Last Payment',
+                          value: formatDate(lastPaymentDate),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            const SectionHeader(
-              title: 'Ledger',
-              subtitle: 'Purchases and payments history',
-              icon: Icons.receipt_long_outlined,
-            ),
-            if (rows.isEmpty)
-              const EmptyStateCard(
-                title: 'No transactions yet',
-                subtitle: 'Add a purchase or payment to see it here.',
+              const SizedBox(height: 12),
+              const SectionHeader(
+                title: 'Ledger',
+                subtitle: 'Purchases and payments history',
                 icon: Icons.receipt_long_outlined,
-              )
-            else
-              Column(
-                children: [
-                  for (final entry in rows) ...[
-                    Card(
-                      child: ListTile(
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: (entry.isDebit
-                                    ? AppColors.success
-                                    : AppColors.danger)
-                                .withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            entry.isDebit
-                                ? Icons.arrow_upward
-                                : Icons.arrow_downward,
-                            color: entry.isDebit
-                                ? AppColors.success
-                                : AppColors.danger,
-                            size: 18,
-                          ),
-                        ),
-                        title:
-                            Text('${entry.type} • ${formatDate(entry.date)}'),
-                        subtitle: Text(entry.note ?? 'No note'),
-                        trailing: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              formatMoney(entry.amount),
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              if (rows.isEmpty)
+                const EmptyStateCard(
+                  title: 'No transactions yet',
+                  subtitle: 'Add a purchase or payment to see it here.',
+                  icon: Icons.receipt_long_outlined,
+                )
+              else
+                Column(
+                  children: [
+                    for (final entry in rows) ...[
+                      Card(
+                        child: ListTile(
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color:
+                                  (entry.isDebit
+                                          ? AppColors.success
+                                          : AppColors.danger)
+                                      .withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            Text(
-                              'Balance: ${formatMoney(entry.runningBalance)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.muted,
+                            child: Icon(
+                              entry.isDebit
+                                  ? Icons.arrow_upward
+                                  : Icons.arrow_downward,
+                              color: entry.isDebit
+                                  ? AppColors.success
+                                  : AppColors.danger,
+                              size: 18,
+                            ),
+                          ),
+                          title: Text(
+                            '${entry.type} • ${formatDate(entry.date)}',
+                          ),
+                          subtitle: Text(entry.note ?? 'No note'),
+                          trailing: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                formatMoney(entry.amount),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                          ],
+                              Text(
+                                'Balance: ${formatMoney(entry.runningBalance)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
+                      const SizedBox(height: 8),
+                    ],
                   ],
-                ],
-              ),
+                ),
             ],
           ),
         ),
@@ -369,7 +392,8 @@ class _PurchaseForSupplierDialog extends StatefulWidget {
       _PurchaseForSupplierDialogState();
 }
 
-class _PurchaseForSupplierDialogState extends State<_PurchaseForSupplierDialog> {
+class _PurchaseForSupplierDialogState
+    extends State<_PurchaseForSupplierDialog> {
   final _formKey = GlobalKey<FormState>();
   String? _unitId;
   DateTime _date = DateTime.now();
@@ -421,10 +445,7 @@ class _PurchaseForSupplierDialogState extends State<_PurchaseForSupplierDialog> 
                   value: _unitId,
                   items: [
                     for (final unit in widget.units)
-                      DropdownMenuItem(
-                        value: unit.id,
-                        child: Text(unit.name),
-                      )
+                      DropdownMenuItem(value: unit.id, child: Text(unit.name)),
                   ],
                   decoration: const InputDecoration(labelText: 'Unit'),
                   onChanged: (value) => setState(() => _unitId = value),
@@ -433,7 +454,9 @@ class _PurchaseForSupplierDialogState extends State<_PurchaseForSupplierDialog> 
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _price,
-                  decoration: const InputDecoration(labelText: 'Price per unit'),
+                  decoration: const InputDecoration(
+                    labelText: 'Price per unit',
+                  ),
                   keyboardType: TextInputType.number,
                   onChanged: (_) => _recalculate(),
                   validator: (value) {
@@ -560,10 +583,11 @@ class _PaymentForSupplierDialogState extends State<_PaymentForSupplierDialog> {
                         child: Text(
                           '${formatDate(purchase.date)} • ${formatMoney(purchase.totalPrice)}',
                         ),
-                      )
+                      ),
                   ],
-                  decoration:
-                      const InputDecoration(labelText: 'Purchase (optional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Purchase (optional)',
+                  ),
                   onChanged: (value) => setState(() => _purchaseId = value),
                 ),
                 const SizedBox(height: 12),

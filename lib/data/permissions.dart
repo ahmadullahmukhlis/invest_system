@@ -29,12 +29,7 @@ class PermissionSet {
   final bool edit;
   final bool remove;
 
-  PermissionSet copyWith({
-    bool? view,
-    bool? create,
-    bool? edit,
-    bool? remove,
-  }) {
+  PermissionSet copyWith({bool? view, bool? create, bool? edit, bool? remove}) {
     return PermissionSet(
       view: view ?? this.view,
       create: create ?? this.create,
@@ -44,17 +39,17 @@ class PermissionSet {
   }
 
   Map<String, Object?> toJson() {
-    return {
-      'view': view,
-      'create': create,
-      'edit': edit,
-      'remove': remove,
-    };
+    return {'view': view, 'create': create, 'edit': edit, 'remove': remove};
   }
 
   static PermissionSet fromJson(Map<dynamic, dynamic>? json) {
     if (json == null) {
-      return PermissionSet(view: false, create: false, edit: false, remove: false);
+      return PermissionSet(
+        view: false,
+        create: false,
+        edit: false,
+        remove: false,
+      );
     }
     return PermissionSet(
       view: (json['view'] as bool?) ?? false,
@@ -70,49 +65,209 @@ Map<String, PermissionSet> defaultPermissionsForRole(String role) {
     case 'super_admin':
       return {
         for (final module in modules)
-          module: PermissionSet(view: true, create: true, edit: true, remove: true),
+          module: PermissionSet(
+            view: true,
+            create: true,
+            edit: true,
+            remove: true,
+          ),
       };
     case 'admin':
       return {
         for (final module in modules)
-          module: PermissionSet(view: true, create: true, edit: true, remove: true),
+          module: PermissionSet(
+            view: true,
+            create: true,
+            edit: true,
+            remove: true,
+          ),
       };
     case 'viewer':
       return {
-        'customers': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'suppliers': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'sales': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'payments': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'purchases': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'supplier_payments': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'units': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'reports': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'settings': PermissionSet(view: false, create: false, edit: false, remove: false),
-        'users': PermissionSet(view: false, create: false, edit: false, remove: false),
-        'sync': PermissionSet(view: false, create: false, edit: false, remove: false),
-        'products': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'vendors': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'inventory': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'approvals': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'customers': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'suppliers': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'sales': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'payments': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'purchases': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'supplier_payments': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'units': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'reports': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'settings': PermissionSet(
+          view: false,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'users': PermissionSet(
+          view: false,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'sync': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'products': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'vendors': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'inventory': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'approvals': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
       };
     case 'staff':
     default:
       return {
-        'customers': PermissionSet(view: true, create: true, edit: false, remove: false),
-        'suppliers': PermissionSet(view: true, create: true, edit: false, remove: false),
-        'sales': PermissionSet(view: true, create: true, edit: false, remove: false),
-        'payments': PermissionSet(view: true, create: true, edit: false, remove: false),
-        'purchases': PermissionSet(view: true, create: true, edit: false, remove: false),
-        'supplier_payments': PermissionSet(view: true, create: true, edit: false, remove: false),
-        'units': PermissionSet(view: true, create: true, edit: false, remove: false),
-        'reports': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'settings': PermissionSet(view: false, create: false, edit: false, remove: false),
-        'users': PermissionSet(view: false, create: false, edit: false, remove: false),
-        'sync': PermissionSet(view: false, create: false, edit: false, remove: false),
-        'products': PermissionSet(view: true, create: true, edit: false, remove: false),
-        'vendors': PermissionSet(view: true, create: true, edit: false, remove: false),
-        'inventory': PermissionSet(view: true, create: true, edit: false, remove: false),
-        'approvals': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'customers': PermissionSet(
+          view: true,
+          create: true,
+          edit: false,
+          remove: false,
+        ),
+        'suppliers': PermissionSet(
+          view: true,
+          create: true,
+          edit: false,
+          remove: false,
+        ),
+        'sales': PermissionSet(
+          view: true,
+          create: true,
+          edit: false,
+          remove: false,
+        ),
+        'payments': PermissionSet(
+          view: true,
+          create: true,
+          edit: false,
+          remove: false,
+        ),
+        'purchases': PermissionSet(
+          view: true,
+          create: true,
+          edit: false,
+          remove: false,
+        ),
+        'supplier_payments': PermissionSet(
+          view: true,
+          create: true,
+          edit: false,
+          remove: false,
+        ),
+        'units': PermissionSet(
+          view: true,
+          create: true,
+          edit: false,
+          remove: false,
+        ),
+        'reports': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'settings': PermissionSet(
+          view: false,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'users': PermissionSet(
+          view: false,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'sync': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
+        'products': PermissionSet(
+          view: true,
+          create: true,
+          edit: false,
+          remove: false,
+        ),
+        'vendors': PermissionSet(
+          view: true,
+          create: true,
+          edit: false,
+          remove: false,
+        ),
+        'inventory': PermissionSet(
+          view: true,
+          create: true,
+          edit: false,
+          remove: false,
+        ),
+        'approvals': PermissionSet(
+          view: true,
+          create: false,
+          edit: false,
+          remove: false,
+        ),
       };
   }
 }
@@ -124,6 +279,10 @@ Map<String, PermissionSet> normalizePermissions(
   final defaults = defaultPermissionsForRole(role);
   final merged = <String, PermissionSet>{};
   for (final entry in defaults.entries) {
+    if (entry.key == 'sync') {
+      merged[entry.key] = entry.value;
+      continue;
+    }
     merged[entry.key] = current[entry.key] ?? entry.value;
   }
   for (final entry in current.entries) {

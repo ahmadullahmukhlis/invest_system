@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/desktop_table.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
@@ -15,39 +16,45 @@ import '../../sales/domain/sale.dart';
 import '../data/payment_providers.dart';
 import '../domain/payment.dart';
 import 'payment_detail_screen.dart';
+import '../../../data/user_providers.dart';
 
 class PaymentsScreen extends ConsumerWidget {
   const PaymentsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userRepo = ref.watch(userRepositoryProvider);
     final payments = ref.watch(paymentsProvider);
     final customers = ref.watch(customersProvider);
     final sales = ref.watch(salesProvider);
+    final canCreatePayment = canCreate(userRepo, 'payments');
+    final canEditPayment = canEdit(userRepo, 'payments');
+    final canDeletePayment = canRemove(userRepo, 'payments');
 
     final isDesktop = Responsive.isDesktop(context);
 
     return DesktopScaffold(
       title: 'Payments Received',
       actions: [
-        IconButton(
-          onPressed: () async {
-            final created = await showDialog<Payment>(
-              context: context,
-              builder: (_) => _PaymentFormDialog(
-                customers: customers,
-                sales: sales,
-                payments: payments,
-                existing: null,
-              ),
-            );
-            if (created != null) {
-              await ref.read(paymentRepositoryProvider).upsert(created);
-            }
-          },
-          icon: const Icon(Icons.add_circle_outline),
-          tooltip: 'Record payment',
-        ),
+        if (canCreatePayment)
+          IconButton(
+            onPressed: () async {
+              final created = await showDialog<Payment>(
+                context: context,
+                builder: (_) => _PaymentFormDialog(
+                  customers: customers,
+                  sales: sales,
+                  payments: payments,
+                  existing: null,
+                ),
+              );
+              if (created != null) {
+                await ref.read(paymentRepositoryProvider).upsert(created);
+              }
+            },
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Record payment',
+          ),
       ],
       body: RefreshWrapper(
         child: ListView(
@@ -84,6 +91,8 @@ class PaymentsScreen extends ConsumerWidget {
                       customers: customers,
                       sales: sales,
                       payments: payments,
+                      canEditPayment: canEditPayment,
+                      canDeletePayment: canDeletePayment,
                     ),
                 ],
               )
@@ -98,6 +107,8 @@ class PaymentsScreen extends ConsumerWidget {
                       customers: customers,
                       sales: sales,
                       payments: payments,
+                      canEditPayment: canEditPayment,
+                      canDeletePayment: canDeletePayment,
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -117,6 +128,8 @@ DataRow _buildPaymentRow(
   required List<Customer> customers,
   required List<Sale> sales,
   required List<Payment> payments,
+  required bool canEditPayment,
+  required bool canDeletePayment,
 }) {
   final customer = customers.isEmpty
       ? null
@@ -155,6 +168,8 @@ DataRow _buildPaymentRow(
             customers,
             sales,
             payments,
+            canEditPayment: canEditPayment,
+            canDeletePayment: canDeletePayment,
           ),
         ),
       ),
@@ -176,6 +191,8 @@ Widget _buildPaymentCard(
   required List<Customer> customers,
   required List<Sale> sales,
   required List<Payment> payments,
+  required bool canEditPayment,
+  required bool canDeletePayment,
 }) {
   final customer = customers.isEmpty
       ? null
@@ -213,8 +230,16 @@ Widget _buildPaymentCard(
             ),
         ],
       ),
-      trailing:
-          _buildPaymentActionsMenu(context, ref, payment, customers, sales, payments),
+      trailing: _buildPaymentActionsMenu(
+        context,
+        ref,
+        payment,
+        customers,
+        sales,
+        payments,
+        canEditPayment: canEditPayment,
+        canDeletePayment: canDeletePayment,
+      ),
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -232,12 +257,19 @@ Widget _buildPaymentActionsMenu(
   Payment payment,
   List<Customer> customers,
   List<Sale> sales,
-  List<Payment> payments,
-) {
+  List<Payment> payments, {
+  required bool canEditPayment,
+  required bool canDeletePayment,
+}) {
+  if (!canEditPayment && !canDeletePayment) {
+    return const SizedBox.shrink();
+  }
+
   return PopupMenuButton<String>(
     onSelected: (value) async {
-      final canEdit =
-          await ref.read(paymentRepositoryProvider).canEdit(payment.id);
+      final canEdit = await ref
+          .read(paymentRepositoryProvider)
+          .canEdit(payment.id);
       if (!canEdit) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -269,9 +301,11 @@ Widget _buildPaymentActionsMenu(
         }
       }
     },
-    itemBuilder: (_) => const [
-      PopupMenuItem(value: 'edit', child: Text('Edit')),
-      PopupMenuItem(value: 'delete', child: Text('Delete')),
+    itemBuilder: (_) => [
+      if (canEditPayment)
+        const PopupMenuItem(value: 'edit', child: Text('Edit')),
+      if (canDeletePayment)
+        const PopupMenuItem(value: 'delete', child: Text('Delete')),
     ],
   );
 }
@@ -335,20 +369,19 @@ class _PaymentFormDialogState extends State<_PaymentFormDialog> {
   Widget build(BuildContext context) {
     Customer? selectedCustomer;
     if (_customerId != null) {
-      final matches =
-          widget.customers.where((customer) => customer.id == _customerId);
+      final matches = widget.customers.where(
+        (customer) => customer.id == _customerId,
+      );
       selectedCustomer = matches.isEmpty ? null : matches.first;
     }
     final customerSales = _customerId == null
         ? const <Sale>[]
-        : widget.sales
-            .where((sale) => sale.customerId == _customerId)
-            .toList();
+        : widget.sales.where((sale) => sale.customerId == _customerId).toList();
     final customerPayments = _customerId == null
         ? const <Payment>[]
         : widget.payments
-            .where((payment) => payment.customerId == _customerId)
-            .toList();
+              .where((payment) => payment.customerId == _customerId)
+              .toList();
     final paidBySale = <String, double>{};
     for (final payment in customerPayments) {
       final saleId = payment.saleId;
@@ -363,9 +396,13 @@ class _PaymentFormDialogState extends State<_PaymentFormDialog> {
       for (final sale in customerSales) sale.id: sale,
     };
     final totalSales = customerSales.fold<double>(
-        0.0, (sum, item) => sum + item.totalPrice);
+      0.0,
+      (sum, item) => sum + item.totalPrice,
+    );
     final totalPayments = customerPayments.fold<double>(
-        0.0, (sum, item) => sum + item.amount);
+      0.0,
+      (sum, item) => sum + item.amount,
+    );
     final balance = totalSales - totalPayments;
 
     return AlertDialog(
@@ -384,15 +421,14 @@ class _PaymentFormDialogState extends State<_PaymentFormDialog> {
                       DropdownMenuItem(
                         value: customer.id,
                         child: Text(customer.name),
-                      )
+                      ),
                   ],
                   decoration: const InputDecoration(labelText: 'Customer'),
                   onChanged: (value) => setState(() {
                     _customerId = value;
                     _saleId = null;
                   }),
-                  validator: (value) =>
-                      value == null ? 'Required' : null,
+                  validator: (value) => value == null ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
                 if (selectedCustomer != null)
@@ -451,17 +487,19 @@ class _PaymentFormDialogState extends State<_PaymentFormDialog> {
                 DropdownButtonFormField<String>(
                   value: _saleId,
                   items: [
-                    for (final sale in widget.sales
-                        .where((sale) => sale.customerId == _customerId))
+                    for (final sale in widget.sales.where(
+                      (sale) => sale.customerId == _customerId,
+                    ))
                       DropdownMenuItem(
                         value: sale.id,
                         child: Text(
                           '${formatDate(sale.date)} • ${formatMoney(sale.totalPrice)}',
                         ),
-                      )
+                      ),
                   ],
-                  decoration:
-                      const InputDecoration(labelText: 'Sale (optional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Sale (optional)',
+                  ),
                   onChanged: (value) => setState(() => _saleId = value),
                 ),
                 const SizedBox(height: 12),
@@ -531,8 +569,7 @@ class _PaymentFormDialogState extends State<_PaymentFormDialog> {
                   title: const Text('Remaining Balance'),
                   trailing: Text(
                     formatMoney(
-                      balance -
-                          (double.tryParse(_amount.text.trim()) ?? 0.0),
+                      balance - (double.tryParse(_amount.text.trim()) ?? 0.0),
                     ),
                   ),
                 ),

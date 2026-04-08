@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/desktop_table.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
@@ -15,39 +16,44 @@ import '../../units/domain/unit.dart';
 import '../data/purchase_providers.dart';
 import '../domain/purchase.dart';
 import 'purchase_detail_screen.dart';
-import '../../receipts/presentation/purchase_receipt_screen.dart';
+import '../../../data/user_providers.dart';
 
 class PurchasesScreen extends ConsumerWidget {
   const PurchasesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userRepo = ref.watch(userRepositoryProvider);
     final purchases = ref.watch(purchasesProvider);
     final suppliers = ref.watch(suppliersProvider);
     final units = ref.watch(unitsProvider);
+    final canCreatePurchase = canCreate(userRepo, 'purchases');
+    final canEditPurchase = canEdit(userRepo, 'purchases');
+    final canDeletePurchase = canRemove(userRepo, 'purchases');
 
     final isDesktop = Responsive.isDesktop(context);
 
     return DesktopScaffold(
       title: 'Purchases',
       actions: [
-        IconButton(
-          onPressed: () async {
-            final created = await showDialog<Purchase>(
-              context: context,
-              builder: (_) => _PurchaseFormDialog(
-                suppliers: suppliers,
-                units: units.where((unit) => unit.isActive).toList(),
-                existing: null,
-              ),
-            );
-            if (created != null) {
-              await ref.read(purchaseRepositoryProvider).upsert(created);
-            }
-          },
-          icon: const Icon(Icons.add_circle_outline),
-          tooltip: 'Add purchase',
-        ),
+        if (canCreatePurchase)
+          IconButton(
+            onPressed: () async {
+              final created = await showDialog<Purchase>(
+                context: context,
+                builder: (_) => _PurchaseFormDialog(
+                  suppliers: suppliers,
+                  units: units.where((unit) => unit.isActive).toList(),
+                  existing: null,
+                ),
+              );
+              if (created != null) {
+                await ref.read(purchaseRepositoryProvider).upsert(created);
+              }
+            },
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Add purchase',
+          ),
       ],
       body: RefreshWrapper(
         child: ListView(
@@ -84,6 +90,8 @@ class PurchasesScreen extends ConsumerWidget {
                       purchase: purchase,
                       suppliers: suppliers,
                       units: units,
+                      canEditPurchase: canEditPurchase,
+                      canDeletePurchase: canDeletePurchase,
                     ),
                 ],
               )
@@ -97,6 +105,8 @@ class PurchasesScreen extends ConsumerWidget {
                       purchase: purchase,
                       suppliers: suppliers,
                       units: units,
+                      canEditPurchase: canEditPurchase,
+                      canDeletePurchase: canDeletePurchase,
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -115,23 +125,25 @@ DataRow _buildPurchaseRow(
   required Purchase purchase,
   required List<Supplier> suppliers,
   required List<Unit> units,
+  required bool canEditPurchase,
+  required bool canDeletePurchase,
 }) {
   final supplierName = suppliers.isEmpty
       ? 'Unknown'
       : suppliers
-          .firstWhere(
-            (item) => item.id == purchase.supplierId,
-            orElse: () => suppliers.first,
-          )
-          .name;
+            .firstWhere(
+              (item) => item.id == purchase.supplierId,
+              orElse: () => suppliers.first,
+            )
+            .name;
   final unitName = units.isEmpty
       ? ''
       : units
-          .firstWhere(
-            (item) => item.id == purchase.unitId,
-            orElse: () => units.first,
-          )
-          .name;
+            .firstWhere(
+              (item) => item.id == purchase.unitId,
+              orElse: () => units.first,
+            )
+            .name;
 
   return DataRow(
     cells: [
@@ -144,8 +156,15 @@ DataRow _buildPurchaseRow(
       DataCell(
         Align(
           alignment: Alignment.centerLeft,
-          child:
-              _buildPurchaseActionsMenu(context, ref, purchase, suppliers, units),
+          child: _buildPurchaseActionsMenu(
+            context,
+            ref,
+            purchase,
+            suppliers,
+            units,
+            canEditPurchase: canEditPurchase,
+            canDeletePurchase: canDeletePurchase,
+          ),
         ),
       ),
     ],
@@ -165,23 +184,25 @@ Widget _buildPurchaseCard(
   required Purchase purchase,
   required List<Supplier> suppliers,
   required List<Unit> units,
+  required bool canEditPurchase,
+  required bool canDeletePurchase,
 }) {
   final supplierName = suppliers.isEmpty
       ? 'Unknown'
       : suppliers
-          .firstWhere(
-            (item) => item.id == purchase.supplierId,
-            orElse: () => suppliers.first,
-          )
-          .name;
+            .firstWhere(
+              (item) => item.id == purchase.supplierId,
+              orElse: () => suppliers.first,
+            )
+            .name;
   final unitName = units.isEmpty
       ? ''
       : units
-          .firstWhere(
-            (item) => item.id == purchase.unitId,
-            orElse: () => units.first,
-          )
-          .name;
+            .firstWhere(
+              (item) => item.id == purchase.unitId,
+              orElse: () => units.first,
+            )
+            .name;
 
   return Card(
     child: ListTile(
@@ -195,8 +216,15 @@ Widget _buildPurchaseCard(
           Text('Total: ${formatMoney(purchase.totalPrice)}'),
         ],
       ),
-      trailing:
-          _buildPurchaseActionsMenu(context, ref, purchase, suppliers, units),
+      trailing: _buildPurchaseActionsMenu(
+        context,
+        ref,
+        purchase,
+        suppliers,
+        units,
+        canEditPurchase: canEditPurchase,
+        canDeletePurchase: canDeletePurchase,
+      ),
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
@@ -213,30 +241,19 @@ Widget _buildPurchaseActionsMenu(
   WidgetRef ref,
   Purchase purchase,
   List<Supplier> suppliers,
-  List<Unit> units,
-) {
+  List<Unit> units, {
+  required bool canEditPurchase,
+  required bool canDeletePurchase,
+}) {
+  if (!canEditPurchase && !canDeletePurchase) {
+    return const SizedBox.shrink();
+  }
+
   return PopupMenuButton<String>(
     onSelected: (value) async {
-      if (value == 'details') {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => PurchaseDetailScreen(purchase: purchase),
-          ),
-        );
-        return;
-      }
-      if (value == 'receipt') {
-        if (context.mounted) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => PurchaseReceiptScreen(purchase: purchase),
-            ),
-          );
-        }
-        return;
-      }
-      final canEdit =
-          await ref.read(purchaseRepositoryProvider).canEdit(purchase.id);
+      final canEdit = await ref
+          .read(purchaseRepositoryProvider)
+          .canEdit(purchase.id);
       if (!canEdit) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -267,11 +284,11 @@ Widget _buildPurchaseActionsMenu(
         }
       }
     },
-    itemBuilder: (_) => const [
-      PopupMenuItem(value: 'details', child: Text('Details')),
-      PopupMenuItem(value: 'receipt', child: Text('Receipt')),
-      PopupMenuItem(value: 'edit', child: Text('Edit')),
-      PopupMenuItem(value: 'delete', child: Text('Delete')),
+    itemBuilder: (_) => [
+      if (canEditPurchase)
+        const PopupMenuItem(value: 'edit', child: Text('Edit')),
+      if (canDeletePurchase)
+        const PopupMenuItem(value: 'delete', child: Text('Delete')),
     ],
   );
 }
@@ -349,12 +366,11 @@ class _PurchaseFormDialogState extends State<_PurchaseFormDialog> {
                       DropdownMenuItem(
                         value: supplier.id,
                         child: Text(supplier.name),
-                      )
+                      ),
                   ],
                   decoration: const InputDecoration(labelText: 'Supplier'),
                   onChanged: (value) => setState(() => _supplierId = value),
-                  validator: (value) =>
-                      value == null ? 'Required' : null,
+                  validator: (value) => value == null ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -375,20 +391,18 @@ class _PurchaseFormDialogState extends State<_PurchaseFormDialog> {
                   value: _unitId,
                   items: [
                     for (final unit in widget.units)
-                      DropdownMenuItem(
-                        value: unit.id,
-                        child: Text(unit.name),
-                      )
+                      DropdownMenuItem(value: unit.id, child: Text(unit.name)),
                   ],
                   decoration: const InputDecoration(labelText: 'Unit'),
                   onChanged: (value) => setState(() => _unitId = value),
-                  validator: (value) =>
-                      value == null ? 'Required' : null,
+                  validator: (value) => value == null ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _price,
-                  decoration: const InputDecoration(labelText: 'Price per unit'),
+                  decoration: const InputDecoration(
+                    labelText: 'Price per unit',
+                  ),
                   keyboardType: TextInputType.number,
                   onChanged: (_) => _recalculate(),
                   validator: (value) {

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/desktop_table.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
+import '../../../data/user_providers.dart';
 import '../../../ui/responsive.dart';
 import 'supplier_form_dialog.dart';
 import '../../purchases/data/purchase_providers.dart';
@@ -27,9 +29,13 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userRepo = ref.watch(userRepositoryProvider);
     final suppliers = ref.watch(suppliersProvider);
     final purchases = ref.watch(purchasesProvider);
     final payments = ref.watch(supplierPaymentsProvider);
+    final canCreateSupplier = canCreate(userRepo, 'suppliers');
+    final canEditSupplier = canEdit(userRepo, 'suppliers');
+    final canDeleteSupplier = canRemove(userRepo, 'suppliers');
 
     final filtered = suppliers.where((supplier) {
       final q = _query.toLowerCase();
@@ -44,19 +50,20 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
     return DesktopScaffold(
       title: 'Suppliers',
       actions: [
-        IconButton(
-          onPressed: () async {
-            final created = await showDialog<Supplier>(
-              context: context,
-              builder: (context) => const SupplierFormDialog(),
-            );
-            if (created != null) {
-              await ref.read(supplierRepositoryProvider).upsert(created);
-            }
-          },
-          icon: const Icon(Icons.add_business_outlined),
-          tooltip: 'Add supplier',
-        ),
+        if (canCreateSupplier)
+          IconButton(
+            onPressed: () async {
+              final created = await showDialog<Supplier>(
+                context: context,
+                builder: (context) => const SupplierFormDialog(),
+              );
+              if (created != null) {
+                await ref.read(supplierRepositoryProvider).upsert(created);
+              }
+            },
+            icon: const Icon(Icons.add_business_outlined),
+            tooltip: 'Add supplier',
+          ),
       ],
       body: RefreshWrapper(
         child: ListView(
@@ -98,6 +105,8 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
                       supplier: supplier,
                       purchases: purchases,
                       payments: payments,
+                      canEditSupplier: canEditSupplier,
+                      canDeleteSupplier: canDeleteSupplier,
                     ),
                 ],
               )
@@ -111,6 +120,8 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
                       supplier: supplier,
                       purchases: purchases,
                       payments: payments,
+                      canEditSupplier: canEditSupplier,
+                      canDeleteSupplier: canDeleteSupplier,
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -128,6 +139,8 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
     required Supplier supplier,
     required List purchases,
     required List payments,
+    required bool canEditSupplier,
+    required bool canDeleteSupplier,
   }) {
     final supplierPurchases = purchases
         .where((purchase) => purchase.supplierId == supplier.id)
@@ -146,7 +159,13 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
         DataCell(
           Align(
             alignment: Alignment.centerLeft,
-            child: _buildActionsMenu(context, ref, supplier),
+            child: _buildActionsMenu(
+              context,
+              ref,
+              supplier,
+              canEditSupplier: canEditSupplier,
+              canDeleteSupplier: canDeleteSupplier,
+            ),
           ),
         ),
       ],
@@ -166,6 +185,8 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
     required Supplier supplier,
     required List purchases,
     required List payments,
+    required bool canEditSupplier,
+    required bool canDeleteSupplier,
   }) {
     final supplierPurchases = purchases
         .where((purchase) => purchase.supplierId == supplier.id)
@@ -184,12 +205,16 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
             Text(
               '${supplier.phone} • ${supplier.province}, ${supplier.district}',
             ),
-            Text(
-              'Balance: ${formatMoney(balance)}',
-            ),
+            Text('Balance: ${formatMoney(balance)}'),
           ],
         ),
-        trailing: _buildActionsMenu(context, ref, supplier),
+        trailing: _buildActionsMenu(
+          context,
+          ref,
+          supplier,
+          canEditSupplier: canEditSupplier,
+          canDeleteSupplier: canDeleteSupplier,
+        ),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -204,20 +229,19 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
   Widget _buildActionsMenu(
     BuildContext context,
     WidgetRef ref,
-    Supplier supplier,
-  ) {
+    Supplier supplier, {
+    required bool canEditSupplier,
+    required bool canDeleteSupplier,
+  }) {
+    if (!canEditSupplier && !canDeleteSupplier) {
+      return const SizedBox.shrink();
+    }
+
     return PopupMenuButton<String>(
       onSelected: (value) async {
-        if (value == 'details') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => SupplierLedgerScreen(supplier: supplier),
-            ),
-          );
-          return;
-        }
-        final canEdit =
-            await ref.read(supplierRepositoryProvider).canEdit(supplier.id);
+        final canEdit = await ref
+            .read(supplierRepositoryProvider)
+            .canEdit(supplier.id);
         if (!canEdit) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -244,21 +268,15 @@ class _SuppliersScreenState extends ConsumerState<SuppliersScreen> {
           }
         }
       },
-      itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: 'details',
-          child: Text('Details'),
-        ),
-        PopupMenuItem(value: 'edit', child: Text('Edit')),
-        PopupMenuItem(
-          value: 'delete',
-          child: Text('Delete'),
-        ),
+      itemBuilder: (_) => [
+        if (canEditSupplier)
+          const PopupMenuItem(value: 'edit', child: Text('Edit')),
+        if (canDeleteSupplier)
+          const PopupMenuItem(value: 'delete', child: Text('Delete')),
       ],
     );
   }
 }
-
 
 Future<bool> _confirmDelete(BuildContext context) async {
   final result = await showDialog<bool>(

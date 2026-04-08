@@ -10,14 +10,13 @@ class AppSidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedIndex = ref.watch(navIndexProvider);
+    final items = ref.watch(visibleNavItemsProvider);
 
     return Container(
       width: 260,
       decoration: const BoxDecoration(
         color: AppColors.card,
-        border: Border(
-          right: BorderSide(color: Color(0xFFE5E7EB)),
-        ),
+        border: Border(right: BorderSide(color: Color(0xFFE5E7EB))),
       ),
       child: SafeArea(
         child: Column(
@@ -44,17 +43,14 @@ class AppSidebar extends ConsumerWidget {
                       children: [
                         Text(
                           'Bulk Sales',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
+                          style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           'Accounting System',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.muted,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.muted),
                         ),
                       ],
                     ),
@@ -66,9 +62,9 @@ class AppSidebar extends ConsumerWidget {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(12),
-                itemCount: navItems.length,
+                itemCount: items.length,
                 itemBuilder: (context, index) {
-                  final item = navItems[index];
+                  final item = items[index];
                   final selected = index == selectedIndex;
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -82,8 +78,9 @@ class AppSidebar extends ConsumerWidget {
                         onTap: () {
                           ref.read(navIndexProvider.notifier).state = index;
                           if (Navigator.of(context).canPop()) {
-                            Navigator.of(context)
-                                .popUntil((route) => route.isFirst);
+                            Navigator.of(
+                              context,
+                            ).popUntil((route) => route.isFirst);
                           }
                         },
                         child: Padding(

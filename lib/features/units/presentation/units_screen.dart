@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/desktop_table.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
 import '../../../ui/responsive.dart';
+import '../../../data/user_providers.dart';
 import '../data/unit_providers.dart';
 import '../domain/unit.dart';
 
@@ -16,26 +18,31 @@ class UnitsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userRepo = ref.watch(userRepositoryProvider);
     final units = ref.watch(unitsProvider);
+    final canCreateUnit = canCreate(userRepo, 'units');
+    final canEditUnit = canEdit(userRepo, 'units');
+    final canDeleteUnit = canRemove(userRepo, 'units');
 
     final isDesktop = Responsive.isDesktop(context);
 
     return DesktopScaffold(
       title: 'Units Settings',
       actions: [
-        IconButton(
-          onPressed: () async {
-            final created = await showDialog<Unit>(
-              context: context,
-              builder: (_) => const _UnitFormDialog(),
-            );
-            if (created != null) {
-              await ref.read(unitRepositoryProvider).upsert(created);
-            }
-          },
-          icon: const Icon(Icons.add_circle_outline),
-          tooltip: 'Add unit',
-        ),
+        if (canCreateUnit)
+          IconButton(
+            onPressed: () async {
+              final created = await showDialog<Unit>(
+                context: context,
+                builder: (_) => const _UnitFormDialog(),
+              );
+              if (created != null) {
+                await ref.read(unitRepositoryProvider).upsert(created);
+              }
+            },
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Add unit',
+          ),
       ],
       body: RefreshWrapper(
         child: ListView(
@@ -62,14 +69,26 @@ class UnitsScreen extends ConsumerWidget {
                 ],
                 rows: [
                   for (final unit in units)
-                    _buildUnitRow(context, ref, unit),
+                    _buildUnitRow(
+                      context,
+                      ref,
+                      unit,
+                      canEditUnit: canEditUnit,
+                      canDeleteUnit: canDeleteUnit,
+                    ),
                 ],
               )
             else
               Column(
                 children: [
                   for (final unit in units) ...[
-                    _buildUnitCard(context, ref, unit),
+                    _buildUnitCard(
+                      context,
+                      ref,
+                      unit,
+                      canEditUnit: canEditUnit,
+                      canDeleteUnit: canDeleteUnit,
+                    ),
                     const SizedBox(height: 8),
                   ],
                 ],
@@ -81,7 +100,13 @@ class UnitsScreen extends ConsumerWidget {
   }
 }
 
-DataRow _buildUnitRow(BuildContext context, WidgetRef ref, Unit unit) {
+DataRow _buildUnitRow(
+  BuildContext context,
+  WidgetRef ref,
+  Unit unit, {
+  required bool canEditUnit,
+  required bool canDeleteUnit,
+}) {
   final statusText = unit.isActive ? 'Active' : 'Inactive';
   final statusColor = unit.isActive ? AppColors.success : AppColors.muted;
 
@@ -107,14 +132,26 @@ DataRow _buildUnitRow(BuildContext context, WidgetRef ref, Unit unit) {
       DataCell(
         Align(
           alignment: Alignment.centerLeft,
-          child: _buildUnitActionsMenu(context, ref, unit),
+          child: _buildUnitActionsMenu(
+            context,
+            ref,
+            unit,
+            canEditUnit: canEditUnit,
+            canDeleteUnit: canDeleteUnit,
+          ),
         ),
       ),
     ],
   );
 }
 
-Widget _buildUnitCard(BuildContext context, WidgetRef ref, Unit unit) {
+Widget _buildUnitCard(
+  BuildContext context,
+  WidgetRef ref,
+  Unit unit, {
+  required bool canEditUnit,
+  required bool canDeleteUnit,
+}) {
   return Card(
     child: ListTile(
       leading: Container(
@@ -125,25 +162,43 @@ Widget _buildUnitCard(BuildContext context, WidgetRef ref, Unit unit) {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(
-          unit.isActive ? Icons.check_circle_outline : Icons.pause_circle_outline,
+          unit.isActive
+              ? Icons.check_circle_outline
+              : Icons.pause_circle_outline,
           color: unit.isActive ? AppColors.success : AppColors.muted,
           size: 18,
         ),
       ),
       title: Text(unit.name),
       subtitle: Text(unit.isActive ? 'Active' : 'Inactive'),
-      trailing: _buildUnitActionsMenu(context, ref, unit),
+      trailing: _buildUnitActionsMenu(
+        context,
+        ref,
+        unit,
+        canEditUnit: canEditUnit,
+        canDeleteUnit: canDeleteUnit,
+      ),
     ),
   );
 }
 
-Widget _buildUnitActionsMenu(BuildContext context, WidgetRef ref, Unit unit) {
+Widget _buildUnitActionsMenu(
+  BuildContext context,
+  WidgetRef ref,
+  Unit unit, {
+  required bool canEditUnit,
+  required bool canDeleteUnit,
+}) {
+  if (!canEditUnit && !canDeleteUnit) {
+    return const SizedBox.shrink();
+  }
+
   return PopupMenuButton<String>(
     onSelected: (value) async {
-      if (value == 'toggle') {
+      if (value == 'toggle' && canEditUnit) {
         await ref.read(unitRepositoryProvider).toggleActive(unit.id);
       }
-      if (value == 'edit') {
+      if (value == 'edit' && canEditUnit) {
         final updated = await showDialog<Unit>(
           context: context,
           builder: (_) => _UnitFormDialog(existing: unit),
@@ -152,7 +207,7 @@ Widget _buildUnitActionsMenu(BuildContext context, WidgetRef ref, Unit unit) {
           await ref.read(unitRepositoryProvider).upsert(updated);
         }
       }
-      if (value == 'delete') {
+      if (value == 'delete' && canDeleteUnit) {
         final confirm = await _confirmDelete(context);
         if (confirm) {
           await ref.read(unitRepositoryProvider).deleteById(unit.id);
@@ -160,12 +215,14 @@ Widget _buildUnitActionsMenu(BuildContext context, WidgetRef ref, Unit unit) {
       }
     },
     itemBuilder: (_) => [
-      PopupMenuItem(
-        value: 'toggle',
-        child: Text(unit.isActive ? 'Deactivate' : 'Activate'),
-      ),
-      const PopupMenuItem(value: 'edit', child: Text('Edit')),
-      const PopupMenuItem(value: 'delete', child: Text('Delete')),
+      if (canEditUnit)
+        PopupMenuItem(
+          value: 'toggle',
+          child: Text(unit.isActive ? 'Deactivate' : 'Activate'),
+        ),
+      if (canEditUnit) const PopupMenuItem(value: 'edit', child: Text('Edit')),
+      if (canDeleteUnit)
+        const PopupMenuItem(value: 'delete', child: Text('Delete')),
     ],
   );
 }

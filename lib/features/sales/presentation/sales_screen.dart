@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/desktop_table.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
@@ -15,39 +16,44 @@ import '../../units/domain/unit.dart';
 import '../data/sale_providers.dart';
 import '../domain/sale.dart';
 import 'sale_detail_screen.dart';
-import '../../receipts/presentation/sale_receipt_screen.dart';
+import '../../../data/user_providers.dart';
 
 class SalesScreen extends ConsumerWidget {
   const SalesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userRepo = ref.watch(userRepositoryProvider);
     final sales = ref.watch(salesProvider);
     final customers = ref.watch(customersProvider);
     final units = ref.watch(unitsProvider);
+    final canCreateSale = canCreate(userRepo, 'sales');
+    final canEditSale = canEdit(userRepo, 'sales');
+    final canDeleteSale = canRemove(userRepo, 'sales');
 
     final isDesktop = Responsive.isDesktop(context);
 
     return DesktopScaffold(
       title: 'Sales',
       actions: [
-        IconButton(
-          onPressed: () async {
-            final created = await showDialog<Sale>(
-              context: context,
-              builder: (_) => _SaleFormDialog(
-                customers: customers,
-                units: units.where((unit) => unit.isActive).toList(),
-                existing: null,
-              ),
-            );
-            if (created != null) {
-              await ref.read(saleRepositoryProvider).upsert(created);
-            }
-          },
-          icon: const Icon(Icons.add_circle_outline),
-          tooltip: 'Add sale',
-        ),
+        if (canCreateSale)
+          IconButton(
+            onPressed: () async {
+              final created = await showDialog<Sale>(
+                context: context,
+                builder: (_) => _SaleFormDialog(
+                  customers: customers,
+                  units: units.where((unit) => unit.isActive).toList(),
+                  existing: null,
+                ),
+              );
+              if (created != null) {
+                await ref.read(saleRepositoryProvider).upsert(created);
+              }
+            },
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Add sale',
+          ),
       ],
       body: RefreshWrapper(
         child: ListView(
@@ -84,6 +90,8 @@ class SalesScreen extends ConsumerWidget {
                       sale: sale,
                       customers: customers,
                       units: units,
+                      canEditSale: canEditSale,
+                      canDeleteSale: canDeleteSale,
                     ),
                 ],
               )
@@ -97,6 +105,8 @@ class SalesScreen extends ConsumerWidget {
                       sale: sale,
                       customers: customers,
                       units: units,
+                      canEditSale: canEditSale,
+                      canDeleteSale: canDeleteSale,
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -115,23 +125,25 @@ DataRow _buildSaleRow(
   required Sale sale,
   required List<Customer> customers,
   required List<Unit> units,
+  required bool canEditSale,
+  required bool canDeleteSale,
 }) {
   final customerName = customers.isEmpty
       ? 'Unknown'
       : customers
-          .firstWhere(
-            (item) => item.id == sale.customerId,
-            orElse: () => customers.first,
-          )
-          .name;
+            .firstWhere(
+              (item) => item.id == sale.customerId,
+              orElse: () => customers.first,
+            )
+            .name;
   final unitName = units.isEmpty
       ? ''
       : units
-          .firstWhere(
-            (item) => item.id == sale.unitId,
-            orElse: () => units.first,
-          )
-          .name;
+            .firstWhere(
+              (item) => item.id == sale.unitId,
+              orElse: () => units.first,
+            )
+            .name;
 
   return DataRow(
     cells: [
@@ -144,16 +156,22 @@ DataRow _buildSaleRow(
       DataCell(
         Align(
           alignment: Alignment.centerLeft,
-          child: _buildSaleActionsMenu(context, ref, sale, customers, units),
+          child: _buildSaleActionsMenu(
+            context,
+            ref,
+            sale,
+            customers,
+            units,
+            canEditSale: canEditSale,
+            canDeleteSale: canDeleteSale,
+          ),
         ),
       ),
     ],
     onSelectChanged: (_) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SaleDetailScreen(sale: sale),
-        ),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => SaleDetailScreen(sale: sale)));
     },
   );
 }
@@ -164,23 +182,25 @@ Widget _buildSaleCard(
   required Sale sale,
   required List<Customer> customers,
   required List<Unit> units,
+  required bool canEditSale,
+  required bool canDeleteSale,
 }) {
   final customerName = customers.isEmpty
       ? 'Unknown'
       : customers
-          .firstWhere(
-            (item) => item.id == sale.customerId,
-            orElse: () => customers.first,
-          )
-          .name;
+            .firstWhere(
+              (item) => item.id == sale.customerId,
+              orElse: () => customers.first,
+            )
+            .name;
   final unitName = units.isEmpty
       ? ''
       : units
-          .firstWhere(
-            (item) => item.id == sale.unitId,
-            orElse: () => units.first,
-          )
-          .name;
+            .firstWhere(
+              (item) => item.id == sale.unitId,
+              orElse: () => units.first,
+            )
+            .name;
 
   return Card(
     child: ListTile(
@@ -194,13 +214,19 @@ Widget _buildSaleCard(
           Text('Total: ${formatMoney(sale.totalPrice)}'),
         ],
       ),
-      trailing: _buildSaleActionsMenu(context, ref, sale, customers, units),
+      trailing: _buildSaleActionsMenu(
+        context,
+        ref,
+        sale,
+        customers,
+        units,
+        canEditSale: canEditSale,
+        canDeleteSale: canDeleteSale,
+      ),
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => SaleDetailScreen(sale: sale),
-          ),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => SaleDetailScreen(sale: sale)));
       },
     ),
   );
@@ -211,28 +237,16 @@ Widget _buildSaleActionsMenu(
   WidgetRef ref,
   Sale sale,
   List<Customer> customers,
-  List<Unit> units,
-) {
+  List<Unit> units, {
+  required bool canEditSale,
+  required bool canDeleteSale,
+}) {
+  if (!canEditSale && !canDeleteSale) {
+    return const SizedBox.shrink();
+  }
+
   return PopupMenuButton<String>(
     onSelected: (value) async {
-      if (value == 'details') {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => SaleDetailScreen(sale: sale),
-          ),
-        );
-        return;
-      }
-      if (value == 'receipt') {
-        if (context.mounted) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => SaleReceiptScreen(sale: sale),
-            ),
-          );
-        }
-        return;
-      }
       final canEdit = await ref.read(saleRepositoryProvider).canEdit(sale.id);
       if (!canEdit) {
         if (context.mounted) {
@@ -264,11 +278,10 @@ Widget _buildSaleActionsMenu(
         }
       }
     },
-    itemBuilder: (_) => const [
-      PopupMenuItem(value: 'details', child: Text('Details')),
-      PopupMenuItem(value: 'receipt', child: Text('Receipt')),
-      PopupMenuItem(value: 'edit', child: Text('Edit')),
-      PopupMenuItem(value: 'delete', child: Text('Delete')),
+    itemBuilder: (_) => [
+      if (canEditSale) const PopupMenuItem(value: 'edit', child: Text('Edit')),
+      if (canDeleteSale)
+        const PopupMenuItem(value: 'delete', child: Text('Delete')),
     ],
   );
 }
@@ -346,12 +359,11 @@ class _SaleFormDialogState extends State<_SaleFormDialog> {
                       DropdownMenuItem(
                         value: customer.id,
                         child: Text(customer.name),
-                      )
+                      ),
                   ],
                   decoration: const InputDecoration(labelText: 'Customer'),
                   onChanged: (value) => setState(() => _customerId = value),
-                  validator: (value) =>
-                      value == null ? 'Required' : null,
+                  validator: (value) => value == null ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -372,20 +384,18 @@ class _SaleFormDialogState extends State<_SaleFormDialog> {
                   value: _unitId,
                   items: [
                     for (final unit in widget.units)
-                      DropdownMenuItem(
-                        value: unit.id,
-                        child: Text(unit.name),
-                      )
+                      DropdownMenuItem(value: unit.id, child: Text(unit.name)),
                   ],
                   decoration: const InputDecoration(labelText: 'Unit'),
                   onChanged: (value) => setState(() => _unitId = value),
-                  validator: (value) =>
-                      value == null ? 'Required' : null,
+                  validator: (value) => value == null ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _price,
-                  decoration: const InputDecoration(labelText: 'Price per unit'),
+                  decoration: const InputDecoration(
+                    labelText: 'Price per unit',
+                  ),
                   keyboardType: TextInputType.number,
                   onChanged: (_) => _recalculate(),
                   validator: (value) {

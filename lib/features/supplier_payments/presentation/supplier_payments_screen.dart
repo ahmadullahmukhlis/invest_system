@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/permission_utils.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/desktop_table.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
@@ -14,41 +15,47 @@ import '../../suppliers/data/supplier_providers.dart';
 import '../../suppliers/domain/supplier.dart';
 import '../data/supplier_payment_providers.dart';
 import '../domain/supplier_payment.dart';
+import '../../../data/user_providers.dart';
 
 class SupplierPaymentsScreen extends ConsumerWidget {
   const SupplierPaymentsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userRepo = ref.watch(userRepositoryProvider);
     final payments = ref.watch(supplierPaymentsProvider);
     final suppliers = ref.watch(suppliersProvider);
     final purchases = ref.watch(purchasesProvider);
+    final canCreateSupplierPayment = canCreate(userRepo, 'supplier_payments');
+    final canEditSupplierPayment = canEdit(userRepo, 'supplier_payments');
+    final canDeleteSupplierPayment = canRemove(userRepo, 'supplier_payments');
 
     final isDesktop = Responsive.isDesktop(context);
 
     return DesktopScaffold(
       title: 'Supplier Payments',
       actions: [
-        IconButton(
-          onPressed: () async {
-            final created = await showDialog<SupplierPayment>(
-              context: context,
-              builder: (_) => _SupplierPaymentFormDialog(
-                suppliers: suppliers,
-                purchases: purchases,
-                payments: payments,
-                existing: null,
-              ),
-            );
-            if (created != null) {
-              await ref
-                  .read(supplierPaymentRepositoryProvider)
-                  .upsert(created);
-            }
-          },
-          icon: const Icon(Icons.add_circle_outline),
-          tooltip: 'Record payment',
-        ),
+        if (canCreateSupplierPayment)
+          IconButton(
+            onPressed: () async {
+              final created = await showDialog<SupplierPayment>(
+                context: context,
+                builder: (_) => _SupplierPaymentFormDialog(
+                  suppliers: suppliers,
+                  purchases: purchases,
+                  payments: payments,
+                  existing: null,
+                ),
+              );
+              if (created != null) {
+                await ref
+                    .read(supplierPaymentRepositoryProvider)
+                    .upsert(created);
+              }
+            },
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Record payment',
+          ),
       ],
       body: RefreshWrapper(
         child: ListView(
@@ -83,6 +90,8 @@ class SupplierPaymentsScreen extends ConsumerWidget {
                       suppliers: suppliers,
                       purchases: purchases,
                       payments: payments,
+                      canEditSupplierPayment: canEditSupplierPayment,
+                      canDeleteSupplierPayment: canDeleteSupplierPayment,
                     ),
                 ],
               )
@@ -97,6 +106,8 @@ class SupplierPaymentsScreen extends ConsumerWidget {
                       suppliers: suppliers,
                       purchases: purchases,
                       payments: payments,
+                      canEditSupplierPayment: canEditSupplierPayment,
+                      canDeleteSupplierPayment: canDeleteSupplierPayment,
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -116,15 +127,17 @@ DataRow _buildSupplierPaymentRow(
   required List<Supplier> suppliers,
   required List<Purchase> purchases,
   required List<SupplierPayment> payments,
+  required bool canEditSupplierPayment,
+  required bool canDeleteSupplierPayment,
 }) {
   final supplierName = suppliers.isEmpty
       ? 'Unknown'
       : suppliers
-          .firstWhere(
-            (item) => item.id == payment.supplierId,
-            orElse: () => suppliers.first,
-          )
-          .name;
+            .firstWhere(
+              (item) => item.id == payment.supplierId,
+              orElse: () => suppliers.first,
+            )
+            .name;
 
   return DataRow(
     cells: [
@@ -141,6 +154,8 @@ DataRow _buildSupplierPaymentRow(
             suppliers,
             purchases,
             payments,
+            canEditSupplierPayment: canEditSupplierPayment,
+            canDeleteSupplierPayment: canDeleteSupplierPayment,
           ),
         ),
       ),
@@ -155,15 +170,17 @@ Widget _buildSupplierPaymentCard(
   required List<Supplier> suppliers,
   required List<Purchase> purchases,
   required List<SupplierPayment> payments,
+  required bool canEditSupplierPayment,
+  required bool canDeleteSupplierPayment,
 }) {
   final supplierName = suppliers.isEmpty
       ? 'Unknown'
       : suppliers
-          .firstWhere(
-            (item) => item.id == payment.supplierId,
-            orElse: () => suppliers.first,
-          )
-          .name;
+            .firstWhere(
+              (item) => item.id == payment.supplierId,
+              orElse: () => suppliers.first,
+            )
+            .name;
 
   return Card(
     child: ListTile(
@@ -178,6 +195,8 @@ Widget _buildSupplierPaymentCard(
         suppliers,
         purchases,
         payments,
+        canEditSupplierPayment: canEditSupplierPayment,
+        canDeleteSupplierPayment: canDeleteSupplierPayment,
       ),
     ),
   );
@@ -189,12 +208,19 @@ Widget _buildSupplierPaymentActionsMenu(
   SupplierPayment payment,
   List<Supplier> suppliers,
   List<Purchase> purchases,
-  List<SupplierPayment> payments,
-) {
+  List<SupplierPayment> payments, {
+  required bool canEditSupplierPayment,
+  required bool canDeleteSupplierPayment,
+}) {
+  if (!canEditSupplierPayment && !canDeleteSupplierPayment) {
+    return const SizedBox.shrink();
+  }
+
   return PopupMenuButton<String>(
     onSelected: (value) async {
-      final canEdit =
-          await ref.read(supplierPaymentRepositoryProvider).canEdit(payment.id);
+      final canEdit = await ref
+          .read(supplierPaymentRepositoryProvider)
+          .canEdit(payment.id);
       if (!canEdit) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -228,9 +254,11 @@ Widget _buildSupplierPaymentActionsMenu(
         }
       }
     },
-    itemBuilder: (_) => const [
-      PopupMenuItem(value: 'edit', child: Text('Edit')),
-      PopupMenuItem(value: 'delete', child: Text('Delete')),
+    itemBuilder: (_) => [
+      if (canEditSupplierPayment)
+        const PopupMenuItem(value: 'edit', child: Text('Edit')),
+      if (canDeleteSupplierPayment)
+        const PopupMenuItem(value: 'delete', child: Text('Delete')),
     ],
   );
 }
@@ -297,19 +325,21 @@ class _SupplierPaymentFormDialogState
     final supplierPurchases = _supplierId == null
         ? 0.0
         : widget.purchases
-            .where((purchase) => purchase.supplierId == _supplierId)
-            .fold(0.0, (sum, item) => sum + item.totalPrice);
+              .where((purchase) => purchase.supplierId == _supplierId)
+              .fold(0.0, (sum, item) => sum + item.totalPrice);
     final supplierPayments = _supplierId == null
         ? 0.0
         : widget.payments
-            .where((payment) => payment.supplierId == _supplierId)
-            .fold(0.0, (sum, item) => sum + item.amount);
+              .where((payment) => payment.supplierId == _supplierId)
+              .fold(0.0, (sum, item) => sum + item.amount);
     final balance = supplierPurchases - supplierPayments;
 
     return AlertDialog(
-      title: Text(widget.existing == null
-          ? 'Add Supplier Payment'
-          : 'Edit Supplier Payment'),
+      title: Text(
+        widget.existing == null
+            ? 'Add Supplier Payment'
+            : 'Edit Supplier Payment',
+      ),
       content: SizedBox(
         width: 420,
         child: Form(
@@ -324,15 +354,14 @@ class _SupplierPaymentFormDialogState
                       DropdownMenuItem(
                         value: supplier.id,
                         child: Text(supplier.name),
-                      )
+                      ),
                   ],
                   decoration: const InputDecoration(labelText: 'Supplier'),
                   onChanged: (value) => setState(() {
                     _supplierId = value;
                     _purchaseId = null;
                   }),
-                  validator: (value) =>
-                      value == null ? 'Required' : null,
+                  validator: (value) => value == null ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
                 if (_supplierId != null)
@@ -380,18 +409,20 @@ class _SupplierPaymentFormDialogState
                   value: _purchaseId,
                   isExpanded: true,
                   items: [
-                    for (final purchase in widget.purchases
-                        .where((purchase) => purchase.supplierId == _supplierId))
+                    for (final purchase in widget.purchases.where(
+                      (purchase) => purchase.supplierId == _supplierId,
+                    ))
                       DropdownMenuItem(
                         value: purchase.id,
                         child: Text(
                           '${formatDate(purchase.date)} • ${formatMoney(purchase.totalPrice)}',
                           overflow: TextOverflow.ellipsis,
                         ),
-                      )
+                      ),
                   ],
-                  decoration:
-                      const InputDecoration(labelText: 'Purchase (optional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Purchase (optional)',
+                  ),
                   onChanged: (value) => setState(() => _purchaseId = value),
                 ),
                 const SizedBox(height: 12),
