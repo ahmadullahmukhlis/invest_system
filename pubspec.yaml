@@ -50,6 +50,7 @@ dependencies:
   printing: ^5.13.4
   share_plus: ^7.2.2
   permission_handler: ^11.3.1
+  excel: ^4.0.2
 
 dev_dependencies:
   flutter_test:
@@ -61,6 +62,15 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/logo/logo.png
+
+dependency_overrides:
+  archive: ^3.6.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
