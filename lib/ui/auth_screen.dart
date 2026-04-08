@@ -117,7 +117,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 8),
                     TextButton(
-                      onPressed: _loading
+                      onPressed: _loading || !Responsive.isTablet(context)
                           ? null
                           : () => setState(() => _isRegister = !_isRegister),
                       child: Text(
@@ -126,6 +126,14 @@ class _AuthScreenState extends State<AuthScreen> {
                             : 'Create new account',
                       ),
                     ),
+                    if (!Responsive.isTablet(context))
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Account creation is available on desktop only.',
+                          style: TextStyle(color: Colors.black54),
+                        ),
+                      ),
                   ],
                 ),
               ),

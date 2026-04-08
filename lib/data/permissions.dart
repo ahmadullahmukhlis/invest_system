@@ -1,13 +1,19 @@
 const modules = [
   'customers',
-  'products',
-  'vendors',
+  'suppliers',
+  'sales',
+  'payments',
   'purchases',
-  'inventory',
-  'approvals',
+  'supplier_payments',
+  'units',
   'reports',
   'settings',
   'users',
+  'sync',
+  'products',
+  'vendors',
+  'inventory',
+  'approvals',
 ];
 
 class PermissionSet {
@@ -71,42 +77,57 @@ Map<String, PermissionSet> defaultPermissionsForRole(String role) {
         for (final module in modules)
           module: PermissionSet(view: true, create: true, edit: true, remove: true),
       };
-    case 'manager':
-      return {
-        'customers': PermissionSet(view: true, create: true, edit: true, remove: false),
-        'products': PermissionSet(view: true, create: true, edit: true, remove: false),
-        'vendors': PermissionSet(view: true, create: true, edit: true, remove: false),
-        'purchases': PermissionSet(view: true, create: true, edit: true, remove: false),
-        'inventory': PermissionSet(view: true, create: true, edit: true, remove: false),
-        'approvals': PermissionSet(view: true, create: true, edit: true, remove: false),
-        'reports': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'settings': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'users': PermissionSet(view: false, create: false, edit: false, remove: false),
-      };
     case 'viewer':
       return {
         'customers': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'suppliers': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'sales': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'payments': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'purchases': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'supplier_payments': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'units': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'reports': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'settings': PermissionSet(view: false, create: false, edit: false, remove: false),
+        'users': PermissionSet(view: false, create: false, edit: false, remove: false),
+        'sync': PermissionSet(view: false, create: false, edit: false, remove: false),
         'products': PermissionSet(view: true, create: false, edit: false, remove: false),
         'vendors': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'purchases': PermissionSet(view: true, create: false, edit: false, remove: false),
         'inventory': PermissionSet(view: true, create: false, edit: false, remove: false),
         'approvals': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'reports': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'settings': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'users': PermissionSet(view: false, create: false, edit: false, remove: false),
       };
     case 'staff':
     default:
       return {
-        'customers': PermissionSet(view: true, create: true, edit: true, remove: false),
-        'products': PermissionSet(view: true, create: true, edit: true, remove: false),
-        'vendors': PermissionSet(view: true, create: true, edit: true, remove: false),
-        'purchases': PermissionSet(view: true, create: true, edit: true, remove: false),
-        'inventory': PermissionSet(view: true, create: false, edit: true, remove: false),
-        'approvals': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'customers': PermissionSet(view: true, create: true, edit: false, remove: false),
+        'suppliers': PermissionSet(view: true, create: true, edit: false, remove: false),
+        'sales': PermissionSet(view: true, create: true, edit: false, remove: false),
+        'payments': PermissionSet(view: true, create: true, edit: false, remove: false),
+        'purchases': PermissionSet(view: true, create: true, edit: false, remove: false),
+        'supplier_payments': PermissionSet(view: true, create: true, edit: false, remove: false),
+        'units': PermissionSet(view: true, create: true, edit: false, remove: false),
         'reports': PermissionSet(view: true, create: false, edit: false, remove: false),
-        'settings': PermissionSet(view: true, create: false, edit: false, remove: false),
+        'settings': PermissionSet(view: false, create: false, edit: false, remove: false),
         'users': PermissionSet(view: false, create: false, edit: false, remove: false),
+        'sync': PermissionSet(view: false, create: false, edit: false, remove: false),
+        'products': PermissionSet(view: true, create: true, edit: false, remove: false),
+        'vendors': PermissionSet(view: true, create: true, edit: false, remove: false),
+        'inventory': PermissionSet(view: true, create: true, edit: false, remove: false),
+        'approvals': PermissionSet(view: true, create: false, edit: false, remove: false),
       };
   }
+}
+
+Map<String, PermissionSet> normalizePermissions(
+  String role,
+  Map<String, PermissionSet> current,
+) {
+  final defaults = defaultPermissionsForRole(role);
+  final merged = <String, PermissionSet>{};
+  for (final entry in defaults.entries) {
+    merged[entry.key] = current[entry.key] ?? entry.value;
+  }
+  for (final entry in current.entries) {
+    merged.putIfAbsent(entry.key, () => entry.value);
+  }
+  return merged;
 }

@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 class LocalDb {
@@ -7,11 +7,23 @@ class LocalDb {
 
   static final LocalDb instance = LocalDb._();
   Database? _db;
+  bool _useMemory = false;
+  final Map<String, Map<String, Map<String, Object?>>> _memoryTables = {};
 
   Future<void> init() async {
     if (_db != null) return;
-    final dir = await getApplicationDocumentsDirectory();
-    final path = p.join(dir.path, 'invest_system.db');
+    if (kIsWeb) {
+      _useMemory = true;
+      _initMemoryTables();
+      return;
+    }
+    String path;
+    final dbPath = await getDatabasesPath();
+    if (dbPath.isEmpty) {
+      path = 'invest_system.db';
+    } else {
+      path = p.join(dbPath, 'invest_system.db');
+    }
     _db = await openDatabase(
       path,
       version: 5,
@@ -24,6 +36,20 @@ class LocalDb {
         await _ensureColumns(db);
       },
     );
+  }
+
+  void _initMemoryTables() {
+    for (final name in const [
+      'customers',
+      'units',
+      'sales',
+      'payments',
+      'suppliers',
+      'purchases',
+      'supplier_payments',
+    ]) {
+      _memoryTables.putIfAbsent(name, () => <String, Map<String, Object?>>{});
+    }
   }
 
   Future<void> _createTables(Database db) async {
@@ -198,6 +224,20 @@ class LocalDb {
     String? ownerUid,
     bool all = false,
   }) async {
+    if (_useMemory) {
+      final rows = _memoryTables[table]?.values ?? const Iterable.empty();
+      final filtered = rows.where((row) {
+        if ((row['deleted'] as int?) == 1) return false;
+        if (all) return true;
+        return (row['owner_uid'] as String? ?? '') == (ownerUid ?? '');
+      }).toList();
+      filtered.sort((a, b) {
+        final aUpdated = (a['updated_at'] as int?) ?? 0;
+        final bUpdated = (b['updated_at'] as int?) ?? 0;
+        return bUpdated.compareTo(aUpdated);
+      });
+      return filtered.map((row) => Map<String, Object?>.from(row)).toList();
+    }
     final rows = await _db!.query(
       table,
       where: all ? 'deleted = 0' : 'owner_uid = ? AND deleted = 0',
@@ -212,6 +252,15 @@ class LocalDb {
     String id, {
     String? ownerUid,
   }) async {
+    if (_useMemory) {
+      final row = _memoryTables[table]?[id];
+      if (row == null) return null;
+      if (ownerUid != null &&
+          (row['owner_uid'] as String? ?? '') != ownerUid) {
+        return null;
+      }
+      return Map<String, Object?>.from(row);
+    }
     final rows = await _db!.query(
       table,
       where: ownerUid == null ? 'id = ?' : 'id = ? AND owner_uid = ?',
@@ -222,6 +271,12 @@ class LocalDb {
   }
 
   Future<void> upsert(String table, Map<String, Object?> data) async {
+    if (_useMemory) {
+      final id = data['id'] as String?;
+      if (id == null || id.isEmpty) return;
+      _memoryTables[table]?[id] = Map<String, Object?>.from(data);
+      return;
+    }
     await _db!.insert(
       table,
       data,
@@ -234,6 +289,15 @@ class LocalDb {
     String? ownerUid,
     bool all = false,
   }) async {
+    if (_useMemory) {
+      final rows = _memoryTables[table]?.values ?? const Iterable.empty();
+      final filtered = rows.where((row) {
+        if ((row['dirty'] as int?) != 1) return false;
+        if (all) return true;
+        return (row['owner_uid'] as String? ?? '') == (ownerUid ?? '');
+      }).toList();
+      return filtered.map((row) => Map<String, Object?>.from(row)).toList();
+    }
     final rows = await _db!.query(
       table,
       where: all ? 'dirty = 1' : 'dirty = 1 AND owner_uid = ?',
@@ -243,6 +307,13 @@ class LocalDb {
   }
 
   Future<void> markClean(String table, String id) async {
+    if (_useMemory) {
+      final row = _memoryTables[table]?[id];
+      if (row != null) {
+        row['dirty'] = 0;
+      }
+      return;
+    }
     await _db!.update(
       table,
       {'dirty': 0},
@@ -252,6 +323,10 @@ class LocalDb {
   }
 
   Future<void> delete(String table, String id) async {
+    if (_useMemory) {
+      _memoryTables[table]?.remove(id);
+      return;
+    }
     await _db!.delete(
       table,
       where: 'id = ?',
@@ -260,6 +335,16 @@ class LocalDb {
   }
 
   Future<void> claimUnowned(String table, String ownerUid) async {
+    if (_useMemory) {
+      final tableMap = _memoryTables[table];
+      if (tableMap == null) return;
+      for (final row in tableMap.values) {
+        if ((row['owner_uid'] as String? ?? '') == '') {
+          row['owner_uid'] = ownerUid;
+        }
+      }
+      return;
+    }
     await _db!.update(
       table,
       {'owner_uid': ownerUid},

@@ -7,7 +7,7 @@ import 'package:invest_system/features/units/domain/unit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../../core/widgets/app_drawer.dart';
+import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/data/geo_providers.dart';
 import '../../../core/data/geo_data.dart';
@@ -223,17 +223,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       return true;
     }).toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reports'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-      ),
-      drawer: const AppDrawer(),
+    return DesktopScaffold(
+      title: 'Reports',
       body: RefreshWrapper(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -243,16 +234,27 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Filter Section
-                  _buildFilterSection(provinces, districts, units, provinceAsync.isLoading, constraints.maxWidth),
+                  _buildFilterSection(
+                    provinces,
+                    districts,
+                    units,
+                    provinceAsync.isLoading,
+                    constraints.maxWidth,
+                  ),
                   const SizedBox(height: 24),
-
-                  // Summary Section
-                  _buildSummarySection(totalSales, totalPurchases, customerRows.length, filteredPurchases.length, constraints.maxWidth),
+                  _buildSummarySection(
+                    totalSales,
+                    totalPurchases,
+                    customerRows.length,
+                    filteredPurchases.length,
+                    constraints.maxWidth,
+                  ),
                   const SizedBox(height: 24),
-
-                  // Customer Report Section
-                  _buildCustomerReportSection(customerRows, unitNames, constraints.maxWidth),
+                  _buildCustomerReportSection(
+                    customerRows,
+                    unitNames,
+                    constraints.maxWidth,
+                  ),
                 ],
               ),
             );
@@ -688,9 +690,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
-              child: Container(
+              child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minWidth: isMobile ? maxWidth : double.infinity,
+                  minWidth: maxWidth,
                 ),
                 child: DataTable(
                   headingRowColor: WidgetStateProperty.resolveWith<Color?>(

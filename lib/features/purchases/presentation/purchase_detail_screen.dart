@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/app_drawer.dart';
+import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
@@ -51,16 +51,9 @@ class PurchaseDetailScreen extends ConsumerWidget {
     final lastPaymentDate =
         related.isEmpty ? null : related.first.date;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Purchase Details'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        actions: [
+    return DesktopScaffold(
+      title: 'Purchase Details',
+      actions: [
           FutureBuilder<bool>(
             future: ref.read(purchaseRepositoryProvider).canEdit(purchase.id),
             builder: (context, snapshot) {
@@ -119,8 +112,6 @@ class PurchaseDetailScreen extends ConsumerWidget {
             },
           ),
         ],
-      ),
-      drawer: const AppDrawer(),
       body: RefreshWrapper(
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),

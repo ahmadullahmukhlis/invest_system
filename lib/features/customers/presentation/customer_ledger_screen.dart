@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/widgets/app_drawer.dart';
+import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
@@ -89,16 +89,9 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
         ? null
         : (payments..sort((a, b) => b.date.compareTo(a.date))).first.date;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Ledger • ${widget.customer.name}'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        actions: [
+    return DesktopScaffold(
+      title: 'Ledger • ${widget.customer.name}',
+      actions: [
           FutureBuilder<bool>(
             future:
                 ref.read(customerRepositoryProvider).canEdit(widget.customer.id),
@@ -195,8 +188,6 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
               icon: const Icon(Icons.clear),
             ),
         ],
-      ),
-      drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: RefreshWrapper(

@@ -1,8 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'core/theme/app_colors.dart';
 import 'core/widgets/app_shell.dart';
+import 'core/widgets/app_scroll_behavior.dart';
 
 class InvestSystemApp extends StatelessWidget {
   const InvestSystemApp({super.key, required this.home});
@@ -11,25 +12,46 @@ class InvestSystemApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final baseTextTheme = GoogleFonts.spaceGroteskTextTheme();
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.indigo,
-      brightness: Brightness.light,
+    final baseTextTheme = Theme.of(context).textTheme;
+    final colorScheme = const ColorScheme.light(
+      primary: AppColors.indigo,
+      secondary: AppColors.accent,
+      surface: AppColors.card,
+      background: AppColors.canvas,
+      error: AppColors.danger,
+      onPrimary: Colors.white,
+      onSecondary: Colors.white,
+      onSurface: Color(0xFF1F2A44),
+      onBackground: Color(0xFF1F2A44),
+      onError: Colors.white,
     );
 
     return MaterialApp(
       title: 'Bulk Sales & Accounting',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const AppScrollBehavior(),
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: colorScheme,
         scaffoldBackgroundColor: AppColors.canvas,
-        textTheme: baseTextTheme.apply(
+        fontFamily: _desktopFontFamily(),
+        textTheme: baseTextTheme.copyWith(
+          titleLarge: baseTextTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
+          ),
+          titleMedium: baseTextTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          titleSmall: baseTextTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ).apply(
           bodyColor: const Color(0xFF1F2A44),
           displayColor: const Color(0xFF1F2A44),
         ),
         appBarTheme: AppBarTheme(
-          backgroundColor: AppColors.canvas,
+          backgroundColor: Colors.white,
           elevation: 0,
           centerTitle: false,
           surfaceTintColor: Colors.transparent,
@@ -41,7 +63,7 @@ class InvestSystemApp extends StatelessWidget {
         ),
         cardTheme: CardThemeData(
           color: AppColors.card,
-          elevation: 1,
+          elevation: 0.5,
           margin: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -112,5 +134,17 @@ class InvestSystemApp extends StatelessWidget {
       ),
       home: home,
     );
+  }
+}
+
+String? _desktopFontFamily() {
+  if (kIsWeb) return null;
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.windows:
+      return 'Segoe UI';
+    case TargetPlatform.macOS:
+      return 'SF Pro Text';
+    default:
+      return null;
   }
 }

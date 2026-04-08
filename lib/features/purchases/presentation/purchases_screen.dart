@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/desktop_scaffold.dart';
+import '../../../core/widgets/desktop_table.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
+import '../../../ui/responsive.dart';
 import '../../suppliers/data/supplier_providers.dart';
 import '../../suppliers/domain/supplier.dart';
 import '../../units/data/unit_providers.dart';
@@ -24,175 +26,254 @@ class PurchasesScreen extends ConsumerWidget {
     final suppliers = ref.watch(suppliersProvider);
     final units = ref.watch(unitsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Purchases'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () async {
-              final created = await showDialog<Purchase>(
-                context: context,
-                builder: (_) => _PurchaseFormDialog(
-                  suppliers: suppliers,
-                  units: units.where((unit) => unit.isActive).toList(),
-                  existing: null,
-                ),
-              );
-              if (created != null) {
-                await ref.read(purchaseRepositoryProvider).upsert(created);
-              }
-            },
-            icon: const Icon(Icons.add_circle_outline),
-          ),
-        ],
-      ),
-      drawer: const AppDrawer(),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: RefreshWrapper(
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [
-              SectionHeader(
-                title: 'Purchases',
-                subtitle: '${purchases.length} records',
-                icon: Icons.shopping_cart_outlined,
+    final isDesktop = Responsive.isDesktop(context);
+
+    return DesktopScaffold(
+      title: 'Purchases',
+      actions: [
+        IconButton(
+          onPressed: () async {
+            final created = await showDialog<Purchase>(
+              context: context,
+              builder: (_) => _PurchaseFormDialog(
+                suppliers: suppliers,
+                units: units.where((unit) => unit.isActive).toList(),
+                existing: null,
               ),
-              if (purchases.isEmpty)
-                const EmptyStateCard(
-                  title: 'No purchases yet',
-                  subtitle: 'Add a purchase to track inventory costs.',
-                  icon: Icons.shopping_cart_outlined,
-                )
-              else
-                Column(
-                  children: [
-                    for (final purchase in purchases) ...[
-                      Builder(
-                        builder: (context) {
-                          final supplierName = suppliers.isEmpty
-                              ? 'Unknown'
-                              : suppliers
-                                  .firstWhere(
-                                    (item) => item.id == purchase.supplierId,
-                                    orElse: () => suppliers.first,
-                                  )
-                                  .name;
-                          final unitName = units.isEmpty
-                              ? ''
-                              : units
-                                  .firstWhere(
-                                    (item) => item.id == purchase.unitId,
-                                    orElse: () => units.first,
-                                  )
-                                  .name;
-                          return Card(
-                            child: ListTile(
-                              title: Text(supplierName),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${formatDate(purchase.date)} • ${purchase.quantityValue} $unitName @ ${formatMoney(purchase.pricePerUnit)}',
-                                  ),
-                                  Text(
-                                      'Total: ${formatMoney(purchase.totalPrice)}'),
-                                ],
-                              ),
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) async {
-                                  if (value == 'details') {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => PurchaseDetailScreen(
-                                          purchase: purchase,
-                                        ),
-                                      ),
-                                    );
-                                    return;
-                                  }
-                            if (value == 'receipt') {
-                              if (context.mounted) {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => PurchaseReceiptScreen(
-                                      purchase: purchase,
-                                    ),
-                                  ),
-                                );
-                              }
-                              return;
-                            }
-                                  final canEdit = await ref
-                                      .read(purchaseRepositoryProvider)
-                                      .canEdit(purchase.id);
-                                  if (!canEdit) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              'You can only edit your own records.'),
-                                        ),
-                                      );
-                                    }
-                                    return;
-                                  }
-                                  if (value == 'edit') {
-                                    final updated = await showDialog<Purchase>(
-                                      context: context,
-                                      builder: (_) => _PurchaseFormDialog(
-                                        suppliers: suppliers,
-                                        units: units
-                                            .where((unit) => unit.isActive)
-                                            .toList(),
-                                        existing: purchase,
-                                      ),
-                                    );
-                                    if (updated != null) {
-                                      await ref
-                                          .read(purchaseRepositoryProvider)
-                                          .upsert(updated);
-                                    }
-                                  }
-                                  if (value == 'delete') {
-                                    final confirm = await _confirmDelete(context);
-                                    if (confirm) {
-                                      await ref
-                                          .read(purchaseRepositoryProvider)
-                                          .deleteById(purchase.id);
-                                    }
-                                  }
-                                },
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(
-                                      value: 'details', child: Text('Details')),
-                                  PopupMenuItem(
-                                      value: 'receipt', child: Text('Receipt')),
-                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
-                                  PopupMenuItem(
-                                      value: 'delete', child: Text('Delete')),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                    ],
+            );
+            if (created != null) {
+              await ref.read(purchaseRepositoryProvider).upsert(created);
+            }
+          },
+          icon: const Icon(Icons.add_circle_outline),
+          tooltip: 'Add purchase',
+        ),
+      ],
+      body: RefreshWrapper(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SectionHeader(
+              title: 'Purchases',
+              subtitle: '${purchases.length} records',
+              icon: Icons.shopping_cart_outlined,
+            ),
+            if (purchases.isEmpty)
+              const EmptyStateCard(
+                title: 'No purchases yet',
+                subtitle: 'Add a purchase to track inventory costs.',
+                icon: Icons.shopping_cart_outlined,
+              )
+            else if (isDesktop)
+              DesktopTable(
+                minWidth: 1100,
+                columns: const [
+                  DataColumn(label: Text('Date')),
+                  DataColumn(label: Text('Supplier')),
+                  DataColumn(label: Text('Note')),
+                  DataColumn(label: Text('Qty')),
+                  DataColumn(label: Text('Unit Price')),
+                  DataColumn(label: Text('Total')),
+                  DataColumn(label: Text('Actions')),
+                ],
+                rows: [
+                  for (final purchase in purchases)
+                    _buildPurchaseRow(
+                      context,
+                      ref,
+                      purchase: purchase,
+                      suppliers: suppliers,
+                      units: units,
+                    ),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  for (final purchase in purchases) ...[
+                    _buildPurchaseCard(
+                      context,
+                      ref,
+                      purchase: purchase,
+                      suppliers: suppliers,
+                      units: units,
+                    ),
+                    const SizedBox(height: 8),
                   ],
-                ),
-            ],
-          ),
+                ],
+              ),
+          ],
         ),
       ),
     );
   }
+}
+
+DataRow _buildPurchaseRow(
+  BuildContext context,
+  WidgetRef ref, {
+  required Purchase purchase,
+  required List<Supplier> suppliers,
+  required List<Unit> units,
+}) {
+  final supplierName = suppliers.isEmpty
+      ? 'Unknown'
+      : suppliers
+          .firstWhere(
+            (item) => item.id == purchase.supplierId,
+            orElse: () => suppliers.first,
+          )
+          .name;
+  final unitName = units.isEmpty
+      ? ''
+      : units
+          .firstWhere(
+            (item) => item.id == purchase.unitId,
+            orElse: () => units.first,
+          )
+          .name;
+
+  return DataRow(
+    cells: [
+      DataCell(Text(formatDate(purchase.date))),
+      DataCell(Text(supplierName)),
+      DataCell(Text(purchase.note?.isNotEmpty == true ? purchase.note! : '-')),
+      DataCell(Text('${purchase.quantityValue} $unitName')),
+      DataCell(Text(formatMoney(purchase.pricePerUnit))),
+      DataCell(Text(formatMoney(purchase.totalPrice))),
+      DataCell(
+        Align(
+          alignment: Alignment.centerLeft,
+          child:
+              _buildPurchaseActionsMenu(context, ref, purchase, suppliers, units),
+        ),
+      ),
+    ],
+    onSelectChanged: (_) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PurchaseDetailScreen(purchase: purchase),
+        ),
+      );
+    },
+  );
+}
+
+Widget _buildPurchaseCard(
+  BuildContext context,
+  WidgetRef ref, {
+  required Purchase purchase,
+  required List<Supplier> suppliers,
+  required List<Unit> units,
+}) {
+  final supplierName = suppliers.isEmpty
+      ? 'Unknown'
+      : suppliers
+          .firstWhere(
+            (item) => item.id == purchase.supplierId,
+            orElse: () => suppliers.first,
+          )
+          .name;
+  final unitName = units.isEmpty
+      ? ''
+      : units
+          .firstWhere(
+            (item) => item.id == purchase.unitId,
+            orElse: () => units.first,
+          )
+          .name;
+
+  return Card(
+    child: ListTile(
+      title: Text(supplierName),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${formatDate(purchase.date)} • ${purchase.quantityValue} $unitName @ ${formatMoney(purchase.pricePerUnit)}',
+          ),
+          Text('Total: ${formatMoney(purchase.totalPrice)}'),
+        ],
+      ),
+      trailing:
+          _buildPurchaseActionsMenu(context, ref, purchase, suppliers, units),
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PurchaseDetailScreen(purchase: purchase),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+Widget _buildPurchaseActionsMenu(
+  BuildContext context,
+  WidgetRef ref,
+  Purchase purchase,
+  List<Supplier> suppliers,
+  List<Unit> units,
+) {
+  return PopupMenuButton<String>(
+    onSelected: (value) async {
+      if (value == 'details') {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PurchaseDetailScreen(purchase: purchase),
+          ),
+        );
+        return;
+      }
+      if (value == 'receipt') {
+        if (context.mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PurchaseReceiptScreen(purchase: purchase),
+            ),
+          );
+        }
+        return;
+      }
+      final canEdit =
+          await ref.read(purchaseRepositoryProvider).canEdit(purchase.id);
+      if (!canEdit) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('You can only edit your own records.'),
+            ),
+          );
+        }
+        return;
+      }
+      if (value == 'edit') {
+        final updated = await showDialog<Purchase>(
+          context: context,
+          builder: (_) => _PurchaseFormDialog(
+            suppliers: suppliers,
+            units: units.where((unit) => unit.isActive).toList(),
+            existing: purchase,
+          ),
+        );
+        if (updated != null) {
+          await ref.read(purchaseRepositoryProvider).upsert(updated);
+        }
+      }
+      if (value == 'delete') {
+        final confirm = await _confirmDelete(context);
+        if (confirm) {
+          await ref.read(purchaseRepositoryProvider).deleteById(purchase.id);
+        }
+      }
+    },
+    itemBuilder: (_) => const [
+      PopupMenuItem(value: 'details', child: Text('Details')),
+      PopupMenuItem(value: 'receipt', child: Text('Receipt')),
+      PopupMenuItem(value: 'edit', child: Text('Edit')),
+      PopupMenuItem(value: 'delete', child: Text('Delete')),
+    ],
+  );
 }
 
 class _PurchaseFormDialog extends StatefulWidget {

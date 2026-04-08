@@ -8,6 +8,7 @@ class UserProfile {
     required this.role,
     required this.permissions,
     required this.updatedAt,
+    required this.isActive,
   });
 
   final String uid;
@@ -16,6 +17,7 @@ class UserProfile {
   final String role;
   final Map<String, PermissionSet> permissions;
   final int updatedAt;
+  final bool isActive;
 
   UserProfile copyWith({
     String? uid,
@@ -24,6 +26,7 @@ class UserProfile {
     String? role,
     Map<String, PermissionSet>? permissions,
     int? updatedAt,
+    bool? isActive,
   }) {
     return UserProfile(
       uid: uid ?? this.uid,
@@ -32,6 +35,7 @@ class UserProfile {
       role: role ?? this.role,
       permissions: permissions ?? this.permissions,
       updatedAt: updatedAt ?? this.updatedAt,
+      isActive: isActive ?? this.isActive,
     );
   }
 
@@ -42,6 +46,7 @@ class UserProfile {
       'role': role,
       'permissions': permissions.map((key, value) => MapEntry(key, value.toJson())),
       'updatedAt': updatedAt,
+      'isActive': isActive,
     };
   }
 
@@ -66,6 +71,7 @@ class UserProfile {
       role: (json['role'] as String?) ?? 'staff',
       permissions: perms,
       updatedAt: (json['updatedAt'] as int?) ?? 0,
+      isActive: (json['isActive'] as bool?) ?? true,
     );
   }
 }

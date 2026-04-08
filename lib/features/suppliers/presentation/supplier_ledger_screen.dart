@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/app_drawer.dart';
+import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
@@ -91,16 +91,9 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
         ? null
         : (payments..sort((a, b) => b.date.compareTo(a.date))).first.date;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Supplier • ${widget.supplier.name}'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        actions: [
+    return DesktopScaffold(
+      title: 'Supplier • ${widget.supplier.name}',
+      actions: [
           FutureBuilder<bool>(
             future:
                 ref.read(supplierRepositoryProvider).canEdit(widget.supplier.id),
@@ -199,8 +192,6 @@ class _SupplierLedgerScreenState extends ConsumerState<SupplierLedgerScreen> {
               icon: const Icon(Icons.clear),
             ),
         ],
-      ),
-      drawer: const AppDrawer(),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: RefreshWrapper(

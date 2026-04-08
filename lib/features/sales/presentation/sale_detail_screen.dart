@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/formatters.dart';
-import '../../../core/widgets/app_drawer.dart';
+import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
@@ -59,16 +59,9 @@ class SaleDetailScreen extends ConsumerWidget {
         .fold(0.0, (sum, item) => sum + item.amount);
     final customerBalance = customerSalesTotal - customerPaymentsTotal;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sale Details'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        actions: [
+    return DesktopScaffold(
+      title: 'Sale Details',
+      actions: [
           FutureBuilder<bool>(
             future: ref.read(saleRepositoryProvider).canEdit(sale.id),
             builder: (context, snapshot) {
@@ -128,8 +121,6 @@ class SaleDetailScreen extends ConsumerWidget {
             },
           ),
         ],
-      ),
-      drawer: const AppDrawer(),
       body: RefreshWrapper(
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
