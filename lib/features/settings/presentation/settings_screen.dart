@@ -157,24 +157,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       if (users.isEmpty) {
                         return const Text('No users found.');
                       }
-                      return DesktopTable(
-                        minWidth: 1000,
-                        columns: const [
-                          DataColumn(label: Text('User')),
-                          DataColumn(label: Text('Email')),
-                          DataColumn(label: Text('Role')),
-                          DataColumn(label: Text('Active')),
-                          DataColumn(label: Text('Sync')),
-                          DataColumn(label: Text('Permissions')),
-                        ],
-                        rows: [
-                          for (final user in users)
-                            _buildUserRow(
-                              context,
-                              userRepo,
-                              user,
-                              canAssignSuper: canAssignSuper,
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FilledButton.icon(
+                              onPressed: () => _showCreateUserDialog(
+                                context,
+                                userRepo,
+                                canAssignSuper: canAssignSuper,
+                              ),
+                              icon: const Icon(Icons.person_add_alt_outlined),
+                              label: const Text('Create User'),
                             ),
+                          ),
+                          const SizedBox(height: 12),
+                          DesktopTable(
+                            minWidth: 1200,
+                            columns: const [
+                              DataColumn(label: Text('User')),
+                              DataColumn(label: Text('Email')),
+                              DataColumn(label: Text('Role')),
+                              DataColumn(label: Text('Active')),
+                              DataColumn(label: Text('Sync')),
+                              DataColumn(label: Text('Permissions')),
+                            ],
+                            rows: [
+                              for (final user in users)
+                                _buildUserRow(
+                                  context,
+                                  userRepo,
+                                  user,
+                                  canAssignSuper: canAssignSuper,
+                                ),
+                            ],
+                          ),
                         ],
                       );
                     },
@@ -336,6 +354,144 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       },
     );
   }
+
+  Future<void> _showCreateUserDialog(
+    BuildContext context,
+    UserRepository userRepo, {
+    required bool canAssignSuper,
+  }) async {
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    var role = 'staff';
+    var creating = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Create User'),
+              content: SizedBox(
+                width: 420,
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: 'Name'),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Required'
+                                : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: emailController,
+                        decoration: const InputDecoration(labelText: 'Email'),
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Required'
+                                : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: passwordController,
+                        decoration: const InputDecoration(labelText: 'Password'),
+                        obscureText: true,
+                        validator: (value) =>
+                            value == null || value.length < 6
+                                ? 'Minimum 6 characters'
+                                : null,
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: role,
+                        decoration: const InputDecoration(labelText: 'Role'),
+                        items: _roles
+                            .where((r) => canAssignSuper || r != 'super_admin')
+                            .map(
+                              (r) => DropdownMenuItem(
+                                value: r,
+                                child: Text(r.replaceAll('_', ' ')),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() => role = value);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: creating ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: creating
+                      ? null
+                      : () async {
+                          if (!(formKey.currentState?.validate() ?? false)) {
+                            return;
+                          }
+                          setState(() => creating = true);
+                          try {
+                            await userRepo.createUser(
+                              email: emailController.text.trim(),
+                              password: passwordController.text,
+                              name: nameController.text.trim(),
+                              role: role,
+                            );
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('User created.'),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Failed to create user: $e'),
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (context.mounted) {
+                              setState(() => creating = false);
+                            }
+                          }
+                        },
+                  child: creating
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Create'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+  }
 }
 
 class _PermissionRow extends StatefulWidget {
@@ -369,24 +525,48 @@ class _PermissionRowState extends State<_PermissionRow> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(widget.module.replaceAll('_', ' ').toUpperCase()),
-        ),
-        _permSwitch('V', _permission.view, (value) {
-          _update(_permission.copyWith(view: value));
-        }),
-        _permSwitch('C', _permission.create, (value) {
-          _update(_permission.copyWith(create: value));
-        }),
-        _permSwitch('E', _permission.edit, (value) {
-          _update(_permission.copyWith(edit: value));
-        }),
-        _permSwitch('D', _permission.remove, (value) {
-          _update(_permission.copyWith(remove: value));
-        }),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 420;
+        final label = Text(
+          widget.module.replaceAll('_', ' ').toUpperCase(),
+          overflow: TextOverflow.ellipsis,
+        );
+        final switches = [
+          _permSwitch('V', _permission.view, (value) {
+            _update(_permission.copyWith(view: value));
+          }),
+          _permSwitch('C', _permission.create, (value) {
+            _update(_permission.copyWith(create: value));
+          }),
+          _permSwitch('E', _permission.edit, (value) {
+            _update(_permission.copyWith(edit: value));
+          }),
+          _permSwitch('D', _permission.remove, (value) {
+            _update(_permission.copyWith(remove: value));
+          }),
+        ];
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              label,
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: switches,
+              ),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: label),
+            ...switches,
+          ],
+        );
+      },
     );
   }
 
@@ -396,7 +576,7 @@ class _PermissionRowState extends State<_PermissionRow> {
     ValueChanged<bool> onChanged,
   ) {
     return SizedBox(
-      width: 52,
+      width: 56,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

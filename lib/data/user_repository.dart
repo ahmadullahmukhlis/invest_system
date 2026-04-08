@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import '../core/utils/network_utils.dart';
 import 'permissions.dart';
@@ -128,6 +129,43 @@ class UserRepository {
       'isActive': isActive,
       'updatedAt': DateTime.now().millisecondsSinceEpoch,
     });
+  }
+
+  Future<void> createUser({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+  }) async {
+    final primaryApp = Firebase.app();
+    final adminApp = await Firebase.initializeApp(
+      name: 'admin-${DateTime.now().millisecondsSinceEpoch}',
+      options: primaryApp.options,
+    );
+    final adminAuth = FirebaseAuth.instanceFor(app: adminApp);
+    try {
+      final credential = await adminAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      await credential.user?.updateDisplayName(name);
+      final uid = credential.user?.uid;
+      if (uid == null) return;
+      final permissions = defaultPermissionsForRole(role);
+      final profile = UserProfile(
+        uid: uid,
+        name: name,
+        email: email,
+        role: role,
+        permissions: permissions,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+        isActive: true,
+      );
+      await _usersRef().child(uid).set(profile.toJson());
+    } finally {
+      await adminAuth.signOut();
+      await adminApp.delete();
+    }
   }
 
   Future<void> _startCurrentListener() async {
