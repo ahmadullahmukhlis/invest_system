@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -36,6 +37,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (kIsWeb) {
     databaseFactory = databaseFactoryFfiWeb;
+  } else if (defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.linux) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
   }
   final initResult = await _initFirebase();
   if (!initResult.ok) {
