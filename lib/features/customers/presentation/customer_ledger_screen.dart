@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/widgets/app_drawer.dart';
+import '../../../core/widgets/desktop_scaffold.dart';
+import '../../../core/utils/permission_utils.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
 import '../../../core/widgets/info_row.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/user_providers.dart';
 import '../../payments/data/payment_providers.dart';
 import 'customer_form_dialog.dart';
 import '../data/customer_providers.dart';
@@ -33,6 +35,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userRepo = ref.watch(userRepositoryProvider);
     final sales = ref.watch(salesProvider).where((sale) {
       return sale.customerId == widget.customer.id;
     }).toList();
@@ -43,22 +46,26 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
 
     final entries = <_LedgerEntry>[];
     for (final sale in sales) {
-      entries.add(_LedgerEntry(
-        date: sale.date,
-        type: 'Sale',
-        amount: sale.totalPrice,
-        note: sale.note,
-        isCredit: true,
-      ));
+      entries.add(
+        _LedgerEntry(
+          date: sale.date,
+          type: 'Sale',
+          amount: sale.totalPrice,
+          note: sale.note,
+          isCredit: true,
+        ),
+      );
     }
     for (final payment in payments) {
-      entries.add(_LedgerEntry(
-        date: payment.date,
-        type: 'Payment',
-        amount: payment.amount,
-        note: payment.note,
-        isCredit: false,
-      ));
+      entries.add(
+        _LedgerEntry(
+          date: payment.date,
+          type: 'Payment',
+          amount: payment.amount,
+          note: payment.note,
+          isCredit: false,
+        ),
+      );
     }
 
     entries.sort((a, b) => a.date.compareTo(b.date));
@@ -66,10 +73,10 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
     final filtered = _range == null
         ? entries
         : entries.where((entry) {
-            return entry.date.isAfter(_range!.start
-                    .subtract(const Duration(days: 1))) &&
-                entry.date.isBefore(
-                    _range!.end.add(const Duration(days: 1)));
+            return entry.date.isAfter(
+                  _range!.start.subtract(const Duration(days: 1)),
+                ) &&
+                entry.date.isBefore(_range!.end.add(const Duration(days: 1)));
           }).toList();
 
     double running = 0;
@@ -78,39 +85,36 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
       return entry.copyWith(runningBalance: running);
     }).toList();
 
-    final totalSales =
-        sales.fold(0.0, (sum, item) => sum + item.totalPrice);
-    final totalPayments =
-        payments.fold(0.0, (sum, item) => sum + item.amount);
+    final totalSales = sales.fold(0.0, (sum, item) => sum + item.totalPrice);
+    final totalPayments = payments.fold(0.0, (sum, item) => sum + item.amount);
     final balance = totalSales - totalPayments;
-    final lastSaleDate =
-        sales.isEmpty ? null : (sales..sort((a, b) => b.date.compareTo(a.date))).first.date;
+    final canEditCustomer = canEdit(userRepo, 'customers');
+    final canDeleteCustomer = canRemove(userRepo, 'customers');
+    final canCreateSale = canCreate(userRepo, 'sales');
+    final canCreatePayment = canCreate(userRepo, 'payments');
+    final lastSaleDate = sales.isEmpty
+        ? null
+        : (sales..sort((a, b) => b.date.compareTo(a.date))).first.date;
     final lastPaymentDate = payments.isEmpty
         ? null
         : (payments..sort((a, b) => b.date.compareTo(a.date))).first.date;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Ledger • ${widget.customer.name}'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        actions: [
+    return DesktopScaffold(
+      title: 'Ledger • ${widget.customer.name}',
+      actions: [
+        if (canEditCustomer)
           FutureBuilder<bool>(
-            future:
-                ref.read(customerRepositoryProvider).canEdit(widget.customer.id),
+            future: ref
+                .read(customerRepositoryProvider)
+                .canEdit(widget.customer.id),
             builder: (context, snapshot) {
               if (snapshot.data != true) return const SizedBox.shrink();
               return IconButton(
                 onPressed: () async {
                   final updated = await showDialog<Customer>(
                     context: context,
-                    builder: (context) => CustomerFormDialog(
-                      existing: widget.customer,
-                    ),
+                    builder: (context) =>
+                        CustomerFormDialog(existing: widget.customer),
                   );
                   if (updated != null) {
                     await ref.read(customerRepositoryProvider).upsert(updated);
@@ -121,8 +125,11 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
               );
             },
           ),
+        if (canDeleteCustomer)
           FutureBuilder<bool>(
-            future: ref.read(customerRepositoryProvider).canEdit(widget.customer.id),
+            future: ref
+                .read(customerRepositoryProvider)
+                .canEdit(widget.customer.id),
             builder: (context, snapshot) {
               if (snapshot.data != true) return const SizedBox.shrink();
               return IconButton(
@@ -140,6 +147,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
               );
             },
           ),
+        if (canCreateSale)
           IconButton(
             onPressed: () async {
               final created = await showDialog<Sale>(
@@ -156,6 +164,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
             icon: const Icon(Icons.add_shopping_cart_outlined),
             tooltip: 'Add Sale',
           ),
+        if (canCreatePayment)
           IconButton(
             onPressed: () async {
               final created = await showDialog<Payment>(
@@ -175,154 +184,161 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
             icon: const Icon(Icons.add_card_outlined),
             tooltip: 'Add Payment',
           ),
-          TextButton.icon(
-            onPressed: () async {
-              final picked = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2020),
-                lastDate: DateTime(2100),
-              );
-              if (picked != null) {
-                setState(() => _range = picked);
-              }
-            },
-            icon: const Icon(Icons.date_range_outlined),
-            label: const Text('Filter'),
+        TextButton.icon(
+          onPressed: () async {
+            final picked = await showDateRangePicker(
+              context: context,
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2100),
+            );
+            if (picked != null) {
+              setState(() => _range = picked);
+            }
+          },
+          icon: const Icon(Icons.date_range_outlined),
+          label: const Text('Filter'),
+        ),
+        if (_range != null)
+          IconButton(
+            onPressed: () => setState(() => _range = null),
+            icon: const Icon(Icons.clear),
           ),
-          if (_range != null)
-            IconButton(
-              onPressed: () => setState(() => _range = null),
-              icon: const Icon(Icons.clear),
-            ),
-        ],
-      ),
-      drawer: const AppDrawer(),
+      ],
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: RefreshWrapper(
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
-            const SectionHeader(
-              title: 'Customer Overview',
-              subtitle: 'Summary and recent activity',
-              icon: Icons.person_outline,
-            ),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Customer Info',
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    InfoRow(label: 'Name', value: widget.customer.name),
-                    InfoRow(label: 'Phone', value: widget.customer.phone),
-                    InfoRow(
-                      label: 'Location',
-                      value:
-                          '${widget.customer.province}, ${widget.customer.district}',
-                    ),
-                    if (widget.customer.address != null &&
-                        widget.customer.address!.isNotEmpty)
-                      InfoRow(
-                        label: 'Address',
-                        value: widget.customer.address!,
+              const SectionHeader(
+                title: 'Customer Overview',
+                subtitle: 'Summary and recent activity',
+                icon: Icons.person_outline,
+              ),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Customer Info',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                    const Divider(height: 24),
-                    Text('Account Summary',
-                        style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    InfoRow(
+                      const SizedBox(height: 8),
+                      InfoRow(label: 'Name', value: widget.customer.name),
+                      InfoRow(label: 'Phone', value: widget.customer.phone),
+                      InfoRow(
+                        label: 'Location',
+                        value:
+                            '${widget.customer.province}, ${widget.customer.district}',
+                      ),
+                      if (widget.customer.address != null &&
+                          widget.customer.address!.isNotEmpty)
+                        InfoRow(
+                          label: 'Address',
+                          value: widget.customer.address!,
+                        ),
+                      const Divider(height: 24),
+                      Text(
+                        'Account Summary',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      InfoRow(
                         label: 'Total Sales',
-                        value: formatMoney(totalSales)),
-                    InfoRow(
+                        value: formatMoney(totalSales),
+                      ),
+                      InfoRow(
                         label: 'Total Payments',
-                        value: formatMoney(totalPayments)),
-                    InfoRow(
-                      label: 'Remaining Balance',
-                      value: formatMoney(balance),
-                      highlight: true,
-                    ),
-                    if (lastSaleDate != null)
-                      InfoRow(
-                        label: 'Last Sale',
-                        value: formatDate(lastSaleDate),
+                        value: formatMoney(totalPayments),
                       ),
-                    if (lastPaymentDate != null)
                       InfoRow(
-                        label: 'Last Payment',
-                        value: formatDate(lastPaymentDate),
+                        label: 'Remaining Balance',
+                        value: formatMoney(balance),
+                        highlight: true,
                       ),
-                  ],
+                      if (lastSaleDate != null)
+                        InfoRow(
+                          label: 'Last Sale',
+                          value: formatDate(lastSaleDate),
+                        ),
+                      if (lastPaymentDate != null)
+                        InfoRow(
+                          label: 'Last Payment',
+                          value: formatDate(lastPaymentDate),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            const SectionHeader(
-              title: 'Ledger',
-              subtitle: 'Sales and payments history',
-              icon: Icons.receipt_long_outlined,
-            ),
-            if (rows.isEmpty)
-              const EmptyStateCard(
-                title: 'No transactions yet',
-                subtitle: 'Add a sale or payment to see it here.',
+              const SizedBox(height: 12),
+              const SectionHeader(
+                title: 'Ledger',
+                subtitle: 'Sales and payments history',
                 icon: Icons.receipt_long_outlined,
-              )
-            else
-              Column(
-                children: [
-                  for (final entry in rows) ...[
-                    Card(
-                      child: ListTile(
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: (entry.isCredit
-                                    ? AppColors.success
-                                    : AppColors.danger)
-                                .withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            entry.isCredit
-                                ? Icons.arrow_upward
-                                : Icons.arrow_downward,
-                            color: entry.isCredit
-                                ? AppColors.success
-                                : AppColors.danger,
-                            size: 18,
-                          ),
-                        ),
-                        title:
-                            Text('${entry.type} • ${formatDate(entry.date)}'),
-                        subtitle: Text(entry.note ?? 'No note'),
-                        trailing: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              formatMoney(entry.amount),
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              if (rows.isEmpty)
+                const EmptyStateCard(
+                  title: 'No transactions yet',
+                  subtitle: 'Add a sale or payment to see it here.',
+                  icon: Icons.receipt_long_outlined,
+                )
+              else
+                Column(
+                  children: [
+                    for (final entry in rows) ...[
+                      Card(
+                        child: ListTile(
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color:
+                                  (entry.isCredit
+                                          ? AppColors.success
+                                          : AppColors.danger)
+                                      .withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            Text(
-                              'Balance: ${formatMoney(entry.runningBalance)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.muted,
+                            child: Icon(
+                              entry.isCredit
+                                  ? Icons.arrow_upward
+                                  : Icons.arrow_downward,
+                              color: entry.isCredit
+                                  ? AppColors.success
+                                  : AppColors.danger,
+                              size: 18,
+                            ),
+                          ),
+                          title: Text(
+                            '${entry.type} • ${formatDate(entry.date)}',
+                          ),
+                          subtitle: Text(entry.note ?? 'No note'),
+                          trailing: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                formatMoney(entry.amount),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                          ],
+                              Text(
+                                'Balance: ${formatMoney(entry.runningBalance)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
+                      const SizedBox(height: 8),
+                    ],
                   ],
-                ],
-              ),
+                ),
             ],
           ),
         ),
@@ -382,10 +398,7 @@ Future<bool> _confirmDelete(BuildContext context) async {
 }
 
 class _SaleForCustomerDialog extends StatefulWidget {
-  const _SaleForCustomerDialog({
-    required this.customerId,
-    required this.units,
-  });
+  const _SaleForCustomerDialog({required this.customerId, required this.units});
 
   final String customerId;
   final List<Unit> units;
@@ -446,10 +459,7 @@ class _SaleForCustomerDialogState extends State<_SaleForCustomerDialog> {
                   value: _unitId,
                   items: [
                     for (final unit in widget.units)
-                      DropdownMenuItem(
-                        value: unit.id,
-                        child: Text(unit.name),
-                      )
+                      DropdownMenuItem(value: unit.id, child: Text(unit.name)),
                   ],
                   decoration: const InputDecoration(labelText: 'Unit'),
                   onChanged: (value) => setState(() => _unitId = value),
@@ -458,7 +468,9 @@ class _SaleForCustomerDialogState extends State<_SaleForCustomerDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _price,
-                  decoration: const InputDecoration(labelText: 'Price per unit'),
+                  decoration: const InputDecoration(
+                    labelText: 'Price per unit',
+                  ),
                   keyboardType: TextInputType.number,
                   onChanged: (_) => _recalculate(),
                   validator: (value) {
@@ -609,10 +621,11 @@ class _PaymentForCustomerDialogState extends State<_PaymentForCustomerDialog> {
                           '${formatDate(sale.date)} • ${formatMoney(sale.totalPrice)}',
                           overflow: TextOverflow.ellipsis,
                         ),
-                      )
+                      ),
                   ],
-                  decoration:
-                      const InputDecoration(labelText: 'Sale (optional)'),
+                  decoration: const InputDecoration(
+                    labelText: 'Sale (optional)',
+                  ),
                   onChanged: (value) => setState(() => _saleId = value),
                 ),
                 const SizedBox(height: 12),

@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/app_drawer.dart';
+import '../../../core/utils/permission_utils.dart';
+import '../../../core/widgets/desktop_scaffold.dart';
+import '../../../core/widgets/desktop_table.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
+import '../../../ui/responsive.dart';
+import '../../../data/user_providers.dart';
 import '../data/unit_providers.dart';
 import '../domain/unit.dart';
 
@@ -14,18 +18,18 @@ class UnitsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userRepo = ref.watch(userRepositoryProvider);
     final units = ref.watch(unitsProvider);
+    final canCreateUnit = canCreate(userRepo, 'units');
+    final canEditUnit = canEdit(userRepo, 'units');
+    final canDeleteUnit = canRemove(userRepo, 'units');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Units Settings'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        actions: [
+    final isDesktop = Responsive.isDesktop(context);
+
+    return DesktopScaffold(
+      title: 'Units Settings',
+      actions: [
+        if (canCreateUnit)
           IconButton(
             onPressed: () async {
               final created = await showDialog<Unit>(
@@ -37,106 +41,190 @@ class UnitsScreen extends ConsumerWidget {
               }
             },
             icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Add unit',
           ),
-        ],
-      ),
-      drawer: const AppDrawer(),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: RefreshWrapper(
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [
-              SectionHeader(
-                title: 'Units',
-                subtitle: '${units.length} records',
-                icon: Icons.straighten,
-              ),
-              if (units.isEmpty)
-                const EmptyStateCard(
-                  title: 'No units yet',
-                  subtitle: 'Add units to use in sales and purchases.',
-                  icon: Icons.straighten_outlined,
-                )
-              else
-                Column(
-                  children: [
-                    for (final unit in units) ...[
-                      Card(
-                        child: ListTile(
-                          leading: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: (unit.isActive
-                                      ? AppColors.success
-                                      : AppColors.muted)
-                                  .withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              unit.isActive
-                                  ? Icons.check_circle_outline
-                                  : Icons.pause_circle_outline,
-                              color: unit.isActive
-                                  ? AppColors.success
-                                  : AppColors.muted,
-                              size: 18,
-                            ),
-                          ),
-                          title: Text(unit.name),
-                          subtitle:
-                              Text(unit.isActive ? 'Active' : 'Inactive'),
-                          trailing: PopupMenuButton<String>(
-                            onSelected: (value) async {
-                              if (value == 'toggle') {
-                                await ref
-                                    .read(unitRepositoryProvider)
-                                    .toggleActive(unit.id);
-                              }
-                              if (value == 'edit') {
-                                final updated = await showDialog<Unit>(
-                                  context: context,
-                                  builder: (_) => _UnitFormDialog(existing: unit),
-                                );
-                                if (updated != null) {
-                                  await ref
-                                      .read(unitRepositoryProvider)
-                                      .upsert(updated);
-                                }
-                              }
-                              if (value == 'delete') {
-                                final confirm = await _confirmDelete(context);
-                                if (confirm) {
-                                  await ref
-                                      .read(unitRepositoryProvider)
-                                      .deleteById(unit.id);
-                                }
-                              }
-                            },
-                            itemBuilder: (_) => [
-                              PopupMenuItem(
-                                value: 'toggle',
-                                child: Text(
-                                    unit.isActive ? 'Deactivate' : 'Activate'),
-                              ),
-                              const PopupMenuItem(
-                                  value: 'edit', child: Text('Edit')),
-                              const PopupMenuItem(
-                                  value: 'delete', child: Text('Delete')),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
+      ],
+      body: RefreshWrapper(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SectionHeader(
+              title: 'Units',
+              subtitle: '${units.length} records',
+              icon: Icons.straighten,
+            ),
+            if (units.isEmpty)
+              const EmptyStateCard(
+                title: 'No units yet',
+                subtitle: 'Add units to use in sales and purchases.',
+                icon: Icons.straighten_outlined,
+              )
+            else if (isDesktop)
+              DesktopTable(
+                minWidth: 700,
+                columns: const [
+                  DataColumn(label: Text('Unit')),
+                  DataColumn(label: Text('Status')),
+                  DataColumn(label: Text('Actions')),
+                ],
+                rows: [
+                  for (final unit in units)
+                    _buildUnitRow(
+                      context,
+                      ref,
+                      unit,
+                      canEditUnit: canEditUnit,
+                      canDeleteUnit: canDeleteUnit,
+                    ),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  for (final unit in units) ...[
+                    _buildUnitCard(
+                      context,
+                      ref,
+                      unit,
+                      canEditUnit: canEditUnit,
+                      canDeleteUnit: canDeleteUnit,
+                    ),
+                    const SizedBox(height: 8),
                   ],
-                ),
-            ],
-          ),
+                ],
+              ),
+          ],
         ),
       ),
     );
   }
+}
+
+DataRow _buildUnitRow(
+  BuildContext context,
+  WidgetRef ref,
+  Unit unit, {
+  required bool canEditUnit,
+  required bool canDeleteUnit,
+}) {
+  final statusText = unit.isActive ? 'Active' : 'Inactive';
+  final statusColor = unit.isActive ? AppColors.success : AppColors.muted;
+
+  return DataRow(
+    cells: [
+      DataCell(Text(unit.name)),
+      DataCell(
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: statusColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(statusText),
+          ],
+        ),
+      ),
+      DataCell(
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _buildUnitActionsMenu(
+            context,
+            ref,
+            unit,
+            canEditUnit: canEditUnit,
+            canDeleteUnit: canDeleteUnit,
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildUnitCard(
+  BuildContext context,
+  WidgetRef ref,
+  Unit unit, {
+  required bool canEditUnit,
+  required bool canDeleteUnit,
+}) {
+  return Card(
+    child: ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: (unit.isActive ? AppColors.success : AppColors.muted)
+              .withOpacity(0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          unit.isActive
+              ? Icons.check_circle_outline
+              : Icons.pause_circle_outline,
+          color: unit.isActive ? AppColors.success : AppColors.muted,
+          size: 18,
+        ),
+      ),
+      title: Text(unit.name),
+      subtitle: Text(unit.isActive ? 'Active' : 'Inactive'),
+      trailing: _buildUnitActionsMenu(
+        context,
+        ref,
+        unit,
+        canEditUnit: canEditUnit,
+        canDeleteUnit: canDeleteUnit,
+      ),
+    ),
+  );
+}
+
+Widget _buildUnitActionsMenu(
+  BuildContext context,
+  WidgetRef ref,
+  Unit unit, {
+  required bool canEditUnit,
+  required bool canDeleteUnit,
+}) {
+  if (!canEditUnit && !canDeleteUnit) {
+    return const SizedBox.shrink();
+  }
+
+  return PopupMenuButton<String>(
+    onSelected: (value) async {
+      if (value == 'toggle' && canEditUnit) {
+        await ref.read(unitRepositoryProvider).toggleActive(unit.id);
+      }
+      if (value == 'edit' && canEditUnit) {
+        final updated = await showDialog<Unit>(
+          context: context,
+          builder: (_) => _UnitFormDialog(existing: unit),
+        );
+        if (updated != null) {
+          await ref.read(unitRepositoryProvider).upsert(updated);
+        }
+      }
+      if (value == 'delete' && canDeleteUnit) {
+        final confirm = await _confirmDelete(context);
+        if (confirm) {
+          await ref.read(unitRepositoryProvider).deleteById(unit.id);
+        }
+      }
+    },
+    itemBuilder: (_) => [
+      if (canEditUnit)
+        PopupMenuItem(
+          value: 'toggle',
+          child: Text(unit.isActive ? 'Deactivate' : 'Activate'),
+        ),
+      if (canEditUnit) const PopupMenuItem(value: 'edit', child: Text('Edit')),
+      if (canDeleteUnit)
+        const PopupMenuItem(value: 'delete', child: Text('Delete')),
+    ],
+  );
 }
 
 class _UnitFormDialog extends StatefulWidget {

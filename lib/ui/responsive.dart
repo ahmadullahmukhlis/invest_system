@@ -5,6 +5,10 @@ class Responsive {
     return MediaQuery.of(context).size.width >= 720;
   }
 
+  static bool isDesktop(BuildContext context) {
+    return MediaQuery.of(context).size.width >= 1100;
+  }
+
   static double maxContentWidth(BuildContext context) {
     return isTablet(context) ? 720 : double.infinity;
   }

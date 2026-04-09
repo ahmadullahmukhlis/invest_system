@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/widgets/app_drawer.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/permission_utils.dart';
+import '../../../core/widgets/desktop_scaffold.dart';
+import '../../../core/widgets/desktop_table.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/empty_state_card.dart';
+import '../../../ui/responsive.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../customers/domain/customer.dart';
 import '../../units/data/unit_providers.dart';
@@ -13,27 +16,27 @@ import '../../units/domain/unit.dart';
 import '../data/sale_providers.dart';
 import '../domain/sale.dart';
 import 'sale_detail_screen.dart';
-import '../../receipts/presentation/sale_receipt_screen.dart';
+import '../../../data/user_providers.dart';
 
 class SalesScreen extends ConsumerWidget {
   const SalesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userRepo = ref.watch(userRepositoryProvider);
     final sales = ref.watch(salesProvider);
     final customers = ref.watch(customersProvider);
     final units = ref.watch(unitsProvider);
+    final canCreateSale = canCreate(userRepo, 'sales');
+    final canEditSale = canEdit(userRepo, 'sales');
+    final canDeleteSale = canRemove(userRepo, 'sales');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sales'),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        actions: [
+    final isDesktop = Responsive.isDesktop(context);
+
+    return DesktopScaffold(
+      title: 'Sales',
+      actions: [
+        if (canCreateSale)
           IconButton(
             onPressed: () async {
               final created = await showDialog<Sale>(
@@ -49,149 +52,238 @@ class SalesScreen extends ConsumerWidget {
               }
             },
             icon: const Icon(Icons.add_circle_outline),
+            tooltip: 'Add sale',
           ),
-        ],
-      ),
-      drawer: const AppDrawer(),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: RefreshWrapper(
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: [
-              SectionHeader(
-                title: 'Sales',
-                subtitle: '${sales.length} records',
+      ],
+      body: RefreshWrapper(
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SectionHeader(
+              title: 'Sales',
+              subtitle: '${sales.length} records',
+              icon: Icons.receipt_long_outlined,
+            ),
+            if (sales.isEmpty)
+              const EmptyStateCard(
+                title: 'No sales yet',
+                subtitle: 'Create a sale to start tracking revenue.',
                 icon: Icons.receipt_long_outlined,
-              ),
-              if (sales.isEmpty)
-                const EmptyStateCard(
-                  title: 'No sales yet',
-                  subtitle: 'Create a sale to start tracking revenue.',
-                  icon: Icons.receipt_long_outlined,
-                )
-              else
-                Column(
-                  children: [
-                    for (final sale in sales) ...[
-                      Builder(
-                        builder: (context) {
-                          final customerName = customers.isEmpty
-                              ? 'Unknown'
-                              : customers
-                                  .firstWhere(
-                                    (item) => item.id == sale.customerId,
-                                    orElse: () => customers.first,
-                                  )
-                                  .name;
-                          final unitName = units.isEmpty
-                              ? ''
-                              : units
-                                  .firstWhere(
-                                    (item) => item.id == sale.unitId,
-                                    orElse: () => units.first,
-                                  )
-                                  .name;
-                          return Card(
-                            child: ListTile(
-                              title: Text(customerName),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${formatDate(sale.date)} • ${sale.quantityValue} $unitName @ ${formatMoney(sale.pricePerUnit)}',
-                                  ),
-                                  Text('Total: ${formatMoney(sale.totalPrice)}'),
-                                ],
-                              ),
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) async {
-                                  if (value == 'details') {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => SaleDetailScreen(
-                                          sale: sale,
-                                        ),
-                                      ),
-                                    );
-                                    return;
-                                  }
-                            if (value == 'receipt') {
-                              if (context.mounted) {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        SaleReceiptScreen(sale: sale),
-                                  ),
-                                );
-                              }
-                              return;
-                            }
-                                  final canEdit = await ref
-                                      .read(saleRepositoryProvider)
-                                      .canEdit(sale.id);
-                                  if (!canEdit) {
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              'You can only edit your own records.'),
-                                        ),
-                                      );
-                                    }
-                                    return;
-                                  }
-                                  if (value == 'edit') {
-                                    final updated = await showDialog<Sale>(
-                                      context: context,
-                                      builder: (_) => _SaleFormDialog(
-                                        customers: customers,
-                                        units: units
-                                            .where((unit) => unit.isActive)
-                                            .toList(),
-                                        existing: sale,
-                                      ),
-                                    );
-                                    if (updated != null) {
-                                      await ref
-                                          .read(saleRepositoryProvider)
-                                          .upsert(updated);
-                                    }
-                                  }
-                                  if (value == 'delete') {
-                                    final confirm =
-                                        await _confirmDelete(context);
-                                    if (confirm) {
-                                      await ref
-                                          .read(saleRepositoryProvider)
-                                          .deleteById(sale.id);
-                                    }
-                                  }
-                                },
-                                itemBuilder: (_) => const [
-                                  PopupMenuItem(
-                                      value: 'details', child: Text('Details')),
-                                  PopupMenuItem(
-                                      value: 'receipt', child: Text('Receipt')),
-                                  PopupMenuItem(value: 'edit', child: Text('Edit')),
-                                  PopupMenuItem(
-                                      value: 'delete', child: Text('Delete')),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                    ],
+              )
+            else if (isDesktop)
+              DesktopTable(
+                minWidth: 1100,
+                columns: const [
+                  DataColumn(label: Text('Date')),
+                  DataColumn(label: Text('Customer')),
+                  DataColumn(label: Text('Note')),
+                  DataColumn(label: Text('Qty')),
+                  DataColumn(label: Text('Unit Price')),
+                  DataColumn(label: Text('Total')),
+                  DataColumn(label: Text('Actions')),
+                ],
+                rows: [
+                  for (final sale in sales)
+                    _buildSaleRow(
+                      context,
+                      ref,
+                      sale: sale,
+                      customers: customers,
+                      units: units,
+                      canEditSale: canEditSale,
+                      canDeleteSale: canDeleteSale,
+                    ),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  for (final sale in sales) ...[
+                    _buildSaleCard(
+                      context,
+                      ref,
+                      sale: sale,
+                      customers: customers,
+                      units: units,
+                      canEditSale: canEditSale,
+                      canDeleteSale: canDeleteSale,
+                    ),
+                    const SizedBox(height: 8),
                   ],
-                ),
-            ],
-          ),
+                ],
+              ),
+          ],
         ),
       ),
     );
   }
+}
+
+DataRow _buildSaleRow(
+  BuildContext context,
+  WidgetRef ref, {
+  required Sale sale,
+  required List<Customer> customers,
+  required List<Unit> units,
+  required bool canEditSale,
+  required bool canDeleteSale,
+}) {
+  final customerName = customers.isEmpty
+      ? 'Unknown'
+      : customers
+            .firstWhere(
+              (item) => item.id == sale.customerId,
+              orElse: () => customers.first,
+            )
+            .name;
+  final unitName = units.isEmpty
+      ? ''
+      : units
+            .firstWhere(
+              (item) => item.id == sale.unitId,
+              orElse: () => units.first,
+            )
+            .name;
+
+  return DataRow(
+    cells: [
+      DataCell(Text(formatDate(sale.date))),
+      DataCell(Text(customerName)),
+      DataCell(Text(sale.note?.isNotEmpty == true ? sale.note! : '-')),
+      DataCell(Text('${sale.quantityValue} $unitName')),
+      DataCell(Text(formatMoney(sale.pricePerUnit))),
+      DataCell(Text(formatMoney(sale.totalPrice))),
+      DataCell(
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _buildSaleActionsMenu(
+            context,
+            ref,
+            sale,
+            customers,
+            units,
+            canEditSale: canEditSale,
+            canDeleteSale: canDeleteSale,
+          ),
+        ),
+      ),
+    ],
+    onSelectChanged: (_) {
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => SaleDetailScreen(sale: sale)));
+    },
+  );
+}
+
+Widget _buildSaleCard(
+  BuildContext context,
+  WidgetRef ref, {
+  required Sale sale,
+  required List<Customer> customers,
+  required List<Unit> units,
+  required bool canEditSale,
+  required bool canDeleteSale,
+}) {
+  final customerName = customers.isEmpty
+      ? 'Unknown'
+      : customers
+            .firstWhere(
+              (item) => item.id == sale.customerId,
+              orElse: () => customers.first,
+            )
+            .name;
+  final unitName = units.isEmpty
+      ? ''
+      : units
+            .firstWhere(
+              (item) => item.id == sale.unitId,
+              orElse: () => units.first,
+            )
+            .name;
+
+  return Card(
+    child: ListTile(
+      title: Text(customerName),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${formatDate(sale.date)} • ${sale.quantityValue} $unitName @ ${formatMoney(sale.pricePerUnit)}',
+          ),
+          Text('Total: ${formatMoney(sale.totalPrice)}'),
+        ],
+      ),
+      trailing: _buildSaleActionsMenu(
+        context,
+        ref,
+        sale,
+        customers,
+        units,
+        canEditSale: canEditSale,
+        canDeleteSale: canDeleteSale,
+      ),
+      onTap: () {
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => SaleDetailScreen(sale: sale)));
+      },
+    ),
+  );
+}
+
+Widget _buildSaleActionsMenu(
+  BuildContext context,
+  WidgetRef ref,
+  Sale sale,
+  List<Customer> customers,
+  List<Unit> units, {
+  required bool canEditSale,
+  required bool canDeleteSale,
+}) {
+  if (!canEditSale && !canDeleteSale) {
+    return const SizedBox.shrink();
+  }
+
+  return PopupMenuButton<String>(
+    onSelected: (value) async {
+      final canEdit = await ref.read(saleRepositoryProvider).canEdit(sale.id);
+      if (!canEdit) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('You can only edit your own records.'),
+            ),
+          );
+        }
+        return;
+      }
+      if (value == 'edit') {
+        final updated = await showDialog<Sale>(
+          context: context,
+          builder: (_) => _SaleFormDialog(
+            customers: customers,
+            units: units.where((unit) => unit.isActive).toList(),
+            existing: sale,
+          ),
+        );
+        if (updated != null) {
+          await ref.read(saleRepositoryProvider).upsert(updated);
+        }
+      }
+      if (value == 'delete') {
+        final confirm = await _confirmDelete(context);
+        if (confirm) {
+          await ref.read(saleRepositoryProvider).deleteById(sale.id);
+        }
+      }
+    },
+    itemBuilder: (_) => [
+      if (canEditSale) const PopupMenuItem(value: 'edit', child: Text('Edit')),
+      if (canDeleteSale)
+        const PopupMenuItem(value: 'delete', child: Text('Delete')),
+    ],
+  );
 }
 
 class _SaleFormDialog extends StatefulWidget {
@@ -267,12 +359,11 @@ class _SaleFormDialogState extends State<_SaleFormDialog> {
                       DropdownMenuItem(
                         value: customer.id,
                         child: Text(customer.name),
-                      )
+                      ),
                   ],
                   decoration: const InputDecoration(labelText: 'Customer'),
                   onChanged: (value) => setState(() => _customerId = value),
-                  validator: (value) =>
-                      value == null ? 'Required' : null,
+                  validator: (value) => value == null ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -293,20 +384,18 @@ class _SaleFormDialogState extends State<_SaleFormDialog> {
                   value: _unitId,
                   items: [
                     for (final unit in widget.units)
-                      DropdownMenuItem(
-                        value: unit.id,
-                        child: Text(unit.name),
-                      )
+                      DropdownMenuItem(value: unit.id, child: Text(unit.name)),
                   ],
                   decoration: const InputDecoration(labelText: 'Unit'),
                   onChanged: (value) => setState(() => _unitId = value),
-                  validator: (value) =>
-                      value == null ? 'Required' : null,
+                  validator: (value) => value == null ? 'Required' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _price,
-                  decoration: const InputDecoration(labelText: 'Price per unit'),
+                  decoration: const InputDecoration(
+                    labelText: 'Price per unit',
+                  ),
                   keyboardType: TextInputType.number,
                   onChanged: (_) => _recalculate(),
                   validator: (value) {

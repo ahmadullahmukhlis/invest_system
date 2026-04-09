@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import '../core/utils/network_utils.dart';
 import 'permissions.dart';
@@ -49,7 +50,7 @@ class UserRepository {
 
   DatabaseReference _usersRef() => _database.ref('users');
 
-  static const superAdminEmail = 'admin@admin.admin';
+  static const superAdminEmail = 'admin@admin.com';
 
   Future<void> ensureCurrentUserProfile() async {
     final user = _auth.currentUser;
@@ -87,6 +88,7 @@ class UserRepository {
       role: role,
       permissions: defaultPermissionsForRole(role),
       updatedAt: DateTime.now().millisecondsSinceEpoch,
+      isActive: true,
     );
     await ref.set(profile.toJson());
   }
@@ -122,6 +124,50 @@ class UserRepository {
     });
   }
 
+  Future<void> updateUserActive(String uid, bool isActive) async {
+    await _usersRef().child(uid).update({
+      'isActive': isActive,
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
+
+  Future<void> createUser({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+  }) async {
+    final primaryApp = Firebase.app();
+    final adminApp = await Firebase.initializeApp(
+      name: 'admin-${DateTime.now().millisecondsSinceEpoch}',
+      options: primaryApp.options,
+    );
+    final adminAuth = FirebaseAuth.instanceFor(app: adminApp);
+    try {
+      final credential = await adminAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      await credential.user?.updateDisplayName(name);
+      final uid = credential.user?.uid;
+      if (uid == null) return;
+      final permissions = defaultPermissionsForRole(role);
+      final profile = UserProfile(
+        uid: uid,
+        name: name,
+        email: email,
+        role: role,
+        permissions: permissions,
+        updatedAt: DateTime.now().millisecondsSinceEpoch,
+        isActive: true,
+      );
+      await _usersRef().child(uid).set(profile.toJson());
+    } finally {
+      await adminAuth.signOut();
+      await adminApp.delete();
+    }
+  }
+
   Future<void> _startCurrentListener() async {
     await _currentSub?.cancel();
     final user = _auth.currentUser;
@@ -131,16 +177,28 @@ class UserRepository {
       if (value is Map) {
         final profile =
             UserProfile.fromJson(user.uid, value.cast<dynamic, dynamic>());
-        if (profile.permissions.isEmpty) {
-          final defaults = defaultPermissionsForRole(profile.role);
+        if (!profile.isActive) {
+          _auth.signOut();
+          return;
+        }
+        final normalized =
+            normalizePermissions(profile.role, profile.permissions);
+        final needsUpdate = normalized.length != profile.permissions.length ||
+            normalized.entries.any((entry) {
+              final current = profile.permissions[entry.key];
+              if (current == null) return true;
+              return current.view != entry.value.view ||
+                  current.create != entry.value.create ||
+                  current.edit != entry.value.edit ||
+                  current.remove != entry.value.remove;
+            });
+        if (needsUpdate) {
           _usersRef().child(user.uid).update({
-            'permissions': defaults.map((k, v) => MapEntry(k, v.toJson())),
+            'permissions': normalized.map((k, v) => MapEntry(k, v.toJson())),
             'updatedAt': DateTime.now().millisecondsSinceEpoch,
           });
-          _current = profile.copyWith(permissions: defaults);
-        } else {
-          _current = profile;
         }
+        _current = profile.copyWith(permissions: normalized);
         _currentController.add(_current);
       }
     });
@@ -159,7 +217,11 @@ class UserRepository {
         final key = entry.key;
         final data = entry.value;
         if (key is! String || data is! Map) continue;
-        users.add(UserProfile.fromJson(key, data.cast<dynamic, dynamic>()));
+        final profile =
+            UserProfile.fromJson(key, data.cast<dynamic, dynamic>());
+        final normalized =
+            normalizePermissions(profile.role, profile.permissions);
+        users.add(profile.copyWith(permissions: normalized));
       }
       _allController.add(users);
     });

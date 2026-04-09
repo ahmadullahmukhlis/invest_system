@@ -5,9 +5,11 @@ import '../../features/sales/data/sale_repository.dart';
 import '../../features/supplier_payments/data/supplier_payment_repository.dart';
 import '../../features/suppliers/data/supplier_repository.dart';
 import '../../features/units/data/unit_repository.dart';
+import '../../data/user_repository.dart';
 
 class SyncService {
   SyncService({
+    required this.userRepository,
     required this.customers,
     required this.suppliers,
     required this.units,
@@ -17,6 +19,7 @@ class SyncService {
     required this.supplierPayments,
   });
 
+  final UserRepository userRepository;
   final CustomerRepository customers;
   final SupplierRepository suppliers;
   final UnitRepository units;
@@ -25,39 +28,54 @@ class SyncService {
   final PurchaseRepository purchases;
   final SupplierPaymentRepository supplierPayments;
 
+  bool get _canSyncSharedData =>
+      userRepository.currentRole == 'admin' ||
+      userRepository.currentRole == 'super_admin';
+
   Future<void> syncAll() async {
-    await Future.wait([
-      customers.syncNow(),
-      suppliers.syncNow(),
-      units.syncNow(),
-      sales.syncNow(),
-      payments.syncNow(),
-      purchases.syncNow(),
-      supplierPayments.syncNow(),
-    ]);
+    await Future.wait(_ownerScopedSyncTasks(sync: true));
   }
 
   Future<void> pullAll() async {
-    await Future.wait([
-      customers.pullRemoteNow(),
-      suppliers.pullRemoteNow(),
-      units.pullRemoteNow(),
-      sales.pullRemoteNow(),
-      payments.pullRemoteNow(),
-      purchases.pullRemoteNow(),
-      supplierPayments.pullRemoteNow(),
-    ]);
+    await Future.wait(_ownerScopedSyncTasks(pull: true));
   }
 
   Future<void> pushAll() async {
-    await Future.wait([
-      customers.pushLocalNow(),
-      suppliers.pushLocalNow(),
-      units.pushLocalNow(),
-      sales.pushLocalNow(),
-      payments.pushLocalNow(),
-      purchases.pushLocalNow(),
-      supplierPayments.pushLocalNow(),
-    ]);
+    await Future.wait(_ownerScopedSyncTasks(push: true));
+  }
+
+  List<Future<void>> _ownerScopedSyncTasks({
+    bool sync = false,
+    bool pull = false,
+    bool push = false,
+  }) {
+    Future<void> run(
+      Future<void> Function() syncFn,
+      Future<void> Function() pullFn,
+      Future<void> Function() pushFn,
+    ) {
+      if (pull) return pullFn();
+      if (push) return pushFn();
+      return syncFn();
+    }
+
+    final tasks = <Future<void>>[
+      run(customers.syncNow, customers.pullRemoteNow, customers.pushLocalNow),
+      run(suppliers.syncNow, suppliers.pullRemoteNow, suppliers.pushLocalNow),
+      run(sales.syncNow, sales.pullRemoteNow, sales.pushLocalNow),
+      run(payments.syncNow, payments.pullRemoteNow, payments.pushLocalNow),
+      run(purchases.syncNow, purchases.pullRemoteNow, purchases.pushLocalNow),
+      run(
+        supplierPayments.syncNow,
+        supplierPayments.pullRemoteNow,
+        supplierPayments.pushLocalNow,
+      ),
+    ];
+
+    if (_canSyncSharedData) {
+      tasks.add(run(units.syncNow, units.pullRemoteNow, units.pushLocalNow));
+    }
+
+    return tasks;
   }
 }

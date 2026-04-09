@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/widgets/app_drawer.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../customers/data/customer_providers.dart';
 import '../../customers/domain/customer.dart';
@@ -50,25 +50,12 @@ class DashboardScreen extends ConsumerWidget {
     final recentSupplierPayments = [...supplierPayments]
       ..sort((a, b) => b.date.compareTo(a.date));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Dashboard',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-        elevation: 0,
-      ),
-      drawer: const AppDrawer(),
+    return DesktopScaffold(
+      title: 'Dashboard',
       body: RefreshWrapper(
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.zero,
           children: [
             // Stats Grid
             LayoutBuilder(
@@ -88,28 +75,28 @@ class DashboardScreen extends ConsumerWidget {
                     value: formatMoney(totalSalesToday),
                     subtitle: 'Total: ${formatMoney(totalSales)}',
                     icon: Icons.trending_up,
-                    color: AppColors.indigo,
+                    color: AppColors.accent,
                   ),
                   _MetricData(
                     title: 'Today\'s Purchases',
                     value: formatMoney(totalPurchasesToday),
                     subtitle: 'Total: ${formatMoney(totalPurchases)}',
                     icon: Icons.shopping_cart,
-                    color: AppColors.indigo,
+                    color: AppColors.amber,
                   ),
                   _MetricData(
                     title: 'Cash Received',
                     value: formatMoney(totalPaymentsReceivedToday),
                     subtitle: 'Total: ${formatMoney(totalPaymentsReceived)}',
                     icon: Icons.arrow_downward,
-                    color: AppColors.indigo,
+                    color: AppColors.success,
                   ),
                   _MetricData(
                     title: 'Cash Paid',
                     value: formatMoney(totalPaymentsPaidToday),
                     subtitle: 'Total: ${formatMoney(totalPaymentsPaid)}',
                     icon: Icons.arrow_upward,
-                    color: AppColors.indigo,
+                    color: AppColors.danger,
                   ),
                   _MetricData(
                     title: 'Receivables',
@@ -123,7 +110,7 @@ class DashboardScreen extends ConsumerWidget {
                     value: formatMoney(totalSupplierBalance),
                     subtitle: 'To suppliers',
                     icon: Icons.business,
-                    color: AppColors.indigo,
+                    color: const Color(0xFF0F766E),
                   ),
                 ];
                 return Wrap(
@@ -249,6 +236,7 @@ class _MetricCard extends StatelessWidget {
         final valueSize = isCompact ? 18.0 : 24.0;
         final iconSize = isCompact ? 18.0 : 20.0;
         return Card(
+          color: color,
           child: Padding(
             padding: EdgeInsets.all(padding),
             child: Column(
@@ -261,17 +249,17 @@ class _MetricCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
+                        color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(icon, color: color, size: iconSize),
+                      child: Icon(icon, color: Colors.white, size: iconSize),
                     ),
                     if (!isCompact)
                       Container(
                         width: 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: color,
+                          color: Colors.white,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -285,7 +273,7 @@ class _MetricCard extends StatelessWidget {
                     value,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: color,
+                      color: Colors.white,
                       fontSize: valueSize,
                     ),
                     maxLines: 1,
@@ -298,6 +286,7 @@ class _MetricCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
                 ),
                 if (!isCompact) ...[
@@ -307,7 +296,7 @@ class _MetricCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.muted,
+                      color: Colors.white70,
                     ),
                   ),
                 ],
