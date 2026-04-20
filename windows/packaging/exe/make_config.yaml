@@ -1,0 +1,7 @@
+app_id: com.example.invest_system
+display_name: Invest System
+publisher_name: Invest System
+executable_name: invest_system.exe
+create_desktop_icon: true
+locales:
+  - en

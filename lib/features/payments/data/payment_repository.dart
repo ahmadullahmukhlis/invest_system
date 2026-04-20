@@ -1,0 +1,420 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+
+import '../../../core/data/local_db.dart';
+import '../../../core/data/realtime_sync_client.dart';
+import '../../../core/utils/id.dart';
+import '../../../core/utils/network_utils.dart';
+import '../../../data/firebase_config.dart';
+import '../../../data/user_repository.dart';
+import '../domain/payment.dart';
+
+class PaymentRepository {
+  PaymentRepository({
+    LocalDb? localDb,
+    FirebaseAuth? auth,
+    FirebaseDatabase? database,
+    Connectivity? connectivity,
+    required UserRepository userRepository,
+  })  : _localDb = localDb ?? LocalDb.instance,
+        _auth = userRepository.isCloudEnabled
+            ? (auth ?? FirebaseAuth.instance)
+            : null,
+        _database = userRepository.isCloudEnabled
+            ? (database ?? databaseInstanceOrNull())
+            : null,
+        _connectivity = connectivity ?? Connectivity(),
+        _userRepository = userRepository;
+
+  final LocalDb _localDb;
+  final FirebaseAuth? _auth;
+  final FirebaseDatabase? _database;
+  final RealtimeSyncClient _restSync = RealtimeSyncClient.instance;
+  final Connectivity _connectivity;
+  final UserRepository _userRepository;
+
+  final _controller = StreamController<List<Payment>>.broadcast();
+  Stream<List<Payment>> get stream => _controller.stream;
+
+  List<Payment> _items = const [];
+  bool _online = false;
+
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  StreamSubscription<DatabaseEvent>? _remoteSub;
+  StreamSubscription? _profileSub;
+
+  Future<void> init() async {
+    await _localDb.init();
+    await _loadLocal();
+
+    final initial = await _connectivity.checkConnectivity();
+    await _handleConnectivity(initial, force: true);
+
+    _connectivitySub = _connectivity.onConnectivityChanged.listen(
+      (result) => _handleConnectivity(result),
+    );
+    _profileSub = _userRepository.currentUserStream.listen((_) async {
+      await _stopRemoteSync();
+      await _loadLocal();
+      final current = await _connectivity.checkConnectivity();
+      await _handleConnectivity(current);
+    });
+  }
+
+  Future<void> dispose() async {
+    await _connectivitySub?.cancel();
+    await _remoteSub?.cancel();
+    await _profileSub?.cancel();
+    await _controller.close();
+  }
+
+  Future<void> upsert(Payment payment) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final resolved = payment.id.isEmpty
+        ? payment.copyWith(id: newId())
+        : payment;
+    if (resolved.id.isNotEmpty) {
+      final existing = await _localDb.getById('payments', resolved.id);
+      if (existing != null &&
+          (existing['owner_uid'] as String? ?? '') != _currentUid) {
+        return;
+      }
+    }
+    final row = _toRow(
+      resolved,
+      ownerUid: _currentUid,
+      updatedAt: now,
+      dirty: true,
+      deleted: 0,
+    );
+    await _localDb.upsert('payments', row);
+    await _loadLocal();
+
+    if (_online) {
+      await _pushRow(row);
+    }
+  }
+
+  Future<void> deleteById(String id) async {
+    final existing =
+        await _localDb.getById('payments', id);
+    if (existing == null) return;
+    if ((existing['owner_uid'] as String? ?? '') != _currentUid) {
+      return;
+    }
+    final updated = Map<String, Object?>.from(existing);
+    updated['deleted'] = 1;
+    updated['dirty'] = 1;
+    updated['updated_at'] = DateTime.now().millisecondsSinceEpoch;
+    await _localDb.upsert('payments', updated);
+    await _loadLocal();
+
+    if (_online) {
+      await _pushRow(updated);
+    }
+  }
+
+  Future<bool> canEdit(String id) async {
+    final existing = await _localDb.getById('payments', id);
+    if (existing == null) return false;
+    return (existing['owner_uid'] as String? ?? '') == _currentUid;
+  }
+
+  String get _currentUid => _userRepository.currentUid;
+
+  bool get _isGlobal =>
+      _userRepository.currentRole == 'admin' ||
+      _userRepository.currentRole == 'super_admin';
+
+  DatabaseReference _ref() {
+    final database = _database;
+    if (database == null) {
+      throw StateError('Cloud sync is disabled.');
+    }
+    return _isGlobal
+        ? database.ref('payments')
+        : database.ref('payments/$_currentUid');
+  }
+
+  String get _collectionPath => _isGlobal ? 'payments' : 'payments/$_currentUid';
+
+  String _itemPath(String ownerUid, String id) {
+    return _isGlobal ? 'payments/$ownerUid/$id' : 'payments/$_currentUid/$id';
+  }
+
+  Future<void> _handleConnectivity(
+    List<ConnectivityResult> result, {
+    bool force = false,
+  }) async {
+    final online = _userRepository.canSyncData &&
+        await hasInternetConnection(result);
+    if (!force && online == _online) return;
+    _online = online;
+
+    if (_online) {
+      await _startRemoteSync();
+      await _pushDirty();
+    } else {
+      await _stopRemoteSync();
+    }
+
+    _controller.add(_items);
+  }
+
+  Future<void> _loadLocal() async {
+    final rows = await _localDb.getAll(
+      'payments',
+      ownerUid: _currentUid,
+      all: _isGlobal,
+    );
+    _items = rows.map(_fromRow).toList();
+    _controller.add(_items);
+  }
+
+  Future<void> _startRemoteSync() async {
+    await _remoteSub?.cancel();
+    if (_database == null) {
+      final value = await _restSync.getJson(_collectionPath);
+      await _applyRemoteSnapshot(value);
+      return;
+    }
+    _remoteSub = _ref().onValue.listen((event) async {
+      await _applyRemoteSnapshot(event.snapshot.value);
+    });
+    final snapshot = await _ref().get();
+    await _applyRemoteSnapshot(snapshot.value);
+  }
+
+  Future<void> _stopRemoteSync() async {
+    await _remoteSub?.cancel();
+    _remoteSub = null;
+  }
+
+  Future<void> _applyRemoteSnapshot(Object? value) async {
+    if (value is! Map) return;
+    var changed = false;
+
+    if (_isGlobal) {
+      for (final userEntry in value.entries) {
+        final ownerUid = userEntry.key;
+        final userData = userEntry.value;
+        if (ownerUid is! String || userData is! Map) continue;
+        for (final entry in userData.entries) {
+          final key = entry.key;
+          final data = entry.value;
+          if (key is! String || data is! Map) continue;
+          final remote = _fromJson(key, ownerUid, data.cast<dynamic, dynamic>());
+          final local = await _localDb.getById(
+            'payments',
+            remote.id,
+            ownerUid: ownerUid,
+          );
+          final localUpdated = (local?['updated_at'] as int?) ?? 0;
+          if (remote.deleted == 1) {
+            if (local != null) {
+              await _localDb.delete('payments', remote.id);
+              changed = true;
+            }
+            continue;
+          }
+          if (local == null || remote.updatedAt > localUpdated) {
+            await _localDb.upsert(
+              'payments',
+              _toRow(
+                remote.data,
+                ownerUid: ownerUid,
+                updatedAt: remote.updatedAt,
+                dirty: false,
+                deleted: 0,
+              ),
+            );
+            changed = true;
+          }
+        }
+      }
+    } else {
+      for (final entry in value.entries) {
+        final key = entry.key;
+        final data = entry.value;
+        if (key is! String || data is! Map) continue;
+        final remote = _fromJson(
+          key,
+          _currentUid,
+          data.cast<dynamic, dynamic>(),
+        );
+        final local = await _localDb.getById(
+          'payments',
+          remote.id,
+          ownerUid: _currentUid,
+        );
+        final localUpdated = (local?['updated_at'] as int?) ?? 0;
+        if (remote.deleted == 1) {
+          if (local != null) {
+            await _localDb.delete('payments', remote.id);
+            changed = true;
+          }
+          continue;
+        }
+        if (local == null || remote.updatedAt > localUpdated) {
+          await _localDb.upsert(
+            'payments',
+            _toRow(
+              remote.data,
+              ownerUid: _currentUid,
+              updatedAt: remote.updatedAt,
+              dirty: false,
+              deleted: 0,
+            ),
+          );
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      await _loadLocal();
+    }
+  }
+
+  Future<void> _pushDirty() async {
+    final rows = await _localDb.getDirty(
+      'payments',
+      ownerUid: _currentUid,
+      all: _isGlobal,
+    );
+    for (final row in rows) {
+      await _pushRow(row);
+    }
+  }
+
+  Future<void> _pushRow(Map<String, Object?> row) async {
+    final ownerUid = row['owner_uid'] as String? ?? '';
+    final id = row['id'] as String? ?? '';
+    if (id.isEmpty) return;
+    final isDeleted = (row['deleted'] as int? ?? 0) == 1;
+    final payload = _toJson(row);
+
+    if (_database == null) {
+      await _restSync.setJson(_itemPath(ownerUid, id), payload);
+    } else if (_isGlobal) {
+      await _database!.ref('payments/$ownerUid/$id').set(payload);
+    } else {
+      await _ref().child(id).set(payload);
+    }
+
+    if (isDeleted) {
+      await _localDb.delete('payments', id);
+    } else {
+      await _localDb.markClean('payments', id);
+    }
+  }
+
+  Payment _fromRow(Map<String, Object?> row) {
+    return Payment(
+      id: row['id'] as String,
+      customerId: row['customer_id'] as String,
+      saleId: row['sale_id'] as String?,
+      date: DateTime.fromMillisecondsSinceEpoch(row['date'] as int),
+      amount: (row['amount'] as num).toDouble(),
+      note: row['note'] as String?,
+    );
+  }
+
+  Map<String, Object?> _toRow(
+    Payment payment, {
+    required String ownerUid,
+    required int updatedAt,
+    required bool dirty,
+    required int deleted,
+  }) {
+    return {
+      'id': payment.id,
+      'owner_uid': ownerUid,
+      'customer_id': payment.customerId,
+      'sale_id': payment.saleId,
+      'date': payment.date.millisecondsSinceEpoch,
+      'amount': payment.amount,
+      'note': payment.note,
+      'deleted': deleted,
+      'updated_at': updatedAt,
+      'dirty': dirty ? 1 : 0,
+    };
+  }
+
+  _RemoteRecord<Payment> _fromJson(
+    String id,
+    String ownerUid,
+    Map<dynamic, dynamic> json,
+  ) {
+    return _RemoteRecord(
+      id: id,
+      ownerUid: ownerUid,
+      updatedAt: (json['updated_at'] as int?) ?? 0,
+      deleted: (json['deleted'] as int?) ?? 0,
+      data: Payment(
+        id: id,
+        customerId: (json['customer_id'] as String?) ?? '',
+        saleId: json['sale_id'] as String?,
+        date: DateTime.fromMillisecondsSinceEpoch(
+          (json['date'] as int?) ?? 0,
+        ),
+        amount: (json['amount'] as num?)?.toDouble() ?? 0,
+        note: json['note'] as String?,
+      ),
+    );
+  }
+
+  Map<String, Object?> _toJson(Map<String, Object?> row) {
+    return {
+      'customer_id': row['customer_id'],
+      'sale_id': row['sale_id'],
+      'date': row['date'],
+      'amount': row['amount'],
+      'note': row['note'],
+      'updated_at': row['updated_at'],
+      'deleted': row['deleted'],
+    };
+  }
+
+  Future<void> syncNow() async {
+    final current = await _connectivity.checkConnectivity();
+    await _handleConnectivity(current, force: true);
+  }
+
+  Future<void> pullRemoteNow() async {
+    if (_online) {
+      await _startRemoteSync();
+    } else {
+      final current = await _connectivity.checkConnectivity();
+      await _handleConnectivity(current, force: true);
+    }
+  }
+
+  Future<void> pushLocalNow() async {
+    if (_online) {
+      await _pushDirty();
+    } else {
+      final current = await _connectivity.checkConnectivity();
+      await _handleConnectivity(current, force: true);
+    }
+  }
+}
+
+class _RemoteRecord<T> {
+  const _RemoteRecord({
+    required this.id,
+    required this.ownerUid,
+    required this.updatedAt,
+    required this.deleted,
+    required this.data,
+  });
+
+  final String id;
+  final String ownerUid;
+  final int updatedAt;
+  final int deleted;
+  final T data;
+}
