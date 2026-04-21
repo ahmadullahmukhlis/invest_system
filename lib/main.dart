@@ -14,7 +14,9 @@ import 'core/widgets/app_shell.dart';
 import 'core/widgets/firebase_setup_screen.dart';
 import 'core/data/sync_providers.dart';
 import 'core/data/sync_service.dart';
+import 'data/permissions.dart';
 import 'data/user_repository.dart';
+import 'data/user_profile.dart';
 import 'data/user_providers.dart';
 import 'firebase_options.dart';
 import 'features/customers/data/customer_providers.dart';
@@ -102,25 +104,57 @@ Future<_FirebaseInitResult> _initFirebase() async {
 }
 
 class AppBootstrap extends StatefulWidget {
-  const AppBootstrap({super.key});
+  const AppBootstrap({super.key, this.useLocalDesktopMode = false});
+
+  final bool useLocalDesktopMode;
 
   @override
   State<AppBootstrap> createState() => _AppBootstrapState();
 }
 
-class _AppBootstrapState extends State<AppBootstrap> {
-  UserRepository? _userRepository;
-  CustomerRepository? _customerRepository;
-  SupplierRepository? _supplierRepository;
-  UnitRepository? _unitRepository;
-  SaleRepository? _saleRepository;
-  PaymentRepository? _paymentRepository;
-  PurchaseRepository? _purchaseRepository;
-  SupplierPaymentRepository? _supplierPaymentRepository;
-  Future<void>? _initFuture;
+class _BootstrapDependencies {
+  const _BootstrapDependencies({
+    required this.userRepository,
+    required this.customerRepository,
+    required this.supplierRepository,
+    required this.unitRepository,
+    required this.saleRepository,
+    required this.paymentRepository,
+    required this.purchaseRepository,
+    required this.supplierPaymentRepository,
+  });
 
-  Future<void> _initAll() async {
-    final userRepository = UserRepository();
+  final UserRepository userRepository;
+  final CustomerRepository customerRepository;
+  final SupplierRepository supplierRepository;
+  final UnitRepository unitRepository;
+  final SaleRepository saleRepository;
+  final PaymentRepository paymentRepository;
+  final PurchaseRepository purchaseRepository;
+  final SupplierPaymentRepository supplierPaymentRepository;
+
+  Future<void> dispose() async {
+    await customerRepository.dispose();
+    await supplierRepository.dispose();
+    await unitRepository.dispose();
+    await saleRepository.dispose();
+    await paymentRepository.dispose();
+    await purchaseRepository.dispose();
+    await supplierPaymentRepository.dispose();
+    await userRepository.dispose();
+  }
+}
+
+class _AppBootstrapState extends State<AppBootstrap> {
+  Future<_BootstrapDependencies>? _initFuture;
+  _BootstrapDependencies? _activeDependencies;
+  String? _initializedUid;
+
+  Future<_BootstrapDependencies> _initAll() async {
+    final userRepository = UserRepository(
+      cloudEnabled: !widget.useLocalDesktopMode,
+      localProfile: _buildLocalDesktopProfile(),
+    );
     final customerRepository = CustomerRepository(
       userRepository: userRepository,
     );
@@ -137,42 +171,56 @@ class _AppBootstrapState extends State<AppBootstrap> {
       userRepository: userRepository,
     );
 
-    _userRepository = userRepository;
-    _customerRepository = customerRepository;
-    _supplierRepository = supplierRepository;
-    _unitRepository = unitRepository;
-    _saleRepository = saleRepository;
-    _paymentRepository = paymentRepository;
-    _purchaseRepository = purchaseRepository;
-    _supplierPaymentRepository = supplierPaymentRepository;
+    await userRepository.init();
+    await customerRepository.init();
+    await supplierRepository.init();
+    await unitRepository.init();
+    await saleRepository.init();
+    await paymentRepository.init();
+    await purchaseRepository.init();
+    await supplierPaymentRepository.init();
 
-    await _userRepository!.init();
-    await _customerRepository!.init();
-    await _supplierRepository!.init();
-    await _unitRepository!.init();
-    await _saleRepository!.init();
-    await _paymentRepository!.init();
-    await _purchaseRepository!.init();
-    await _supplierPaymentRepository!.init();
+    return _BootstrapDependencies(
+      userRepository: userRepository,
+      customerRepository: customerRepository,
+      supplierRepository: supplierRepository,
+      unitRepository: unitRepository,
+      saleRepository: saleRepository,
+      paymentRepository: paymentRepository,
+      purchaseRepository: purchaseRepository,
+      supplierPaymentRepository: supplierPaymentRepository,
+    );
+  }
+
+  UserProfile? _buildLocalDesktopProfile() {
+    if (!widget.useLocalDesktopMode) return null;
+    final authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null) return null;
+
+    final email = (authUser.email ?? '').trim();
+    final role = email.toLowerCase() == UserRepository.superAdminEmail
+        ? 'super_admin'
+        : 'viewer';
+    final displayName = (authUser.displayName ?? '').trim();
+    return UserProfile(
+      uid: authUser.uid,
+      name: displayName.isNotEmpty
+          ? displayName
+          : (email.isNotEmpty ? email : 'Desktop User'),
+      email: email.isNotEmpty ? email : 'desktop@local',
+      role: role,
+      permissions: defaultPermissionsForRole(role),
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+      isActive: true,
+    );
   }
 
   Future<void> _disposeAll() async {
-    await _customerRepository?.dispose();
-    await _supplierRepository?.dispose();
-    await _unitRepository?.dispose();
-    await _saleRepository?.dispose();
-    await _paymentRepository?.dispose();
-    await _purchaseRepository?.dispose();
-    await _supplierPaymentRepository?.dispose();
-    await _userRepository?.dispose();
-    _customerRepository = null;
-    _supplierRepository = null;
-    _unitRepository = null;
-    _saleRepository = null;
-    _paymentRepository = null;
-    _purchaseRepository = null;
-    _supplierPaymentRepository = null;
-    _userRepository = null;
+    final dependencies = _activeDependencies;
+    _activeDependencies = null;
+    if (dependencies != null) {
+      await dependencies.dispose();
+    }
   }
 
   @override
@@ -186,74 +234,119 @@ class _AppBootstrapState extends State<AppBootstrap> {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingApp();
+        }
+
         final user = snapshot.data;
         if (user == null) {
-          _initFuture = null;
-          unawaited(_disposeAll());
-          return const InvestSystemApp(home: AuthScreen());
+          if (_initializedUid != null) {
+            _initializedUid = null;
+            _initFuture = null;
+            unawaited(_disposeAll());
+          }
+          return InvestSystemApp(
+            home: AuthScreen(
+              syncProfileToDatabase: !widget.useLocalDesktopMode,
+            ),
+          );
+        }
+
+        if (_initializedUid != user.uid) {
+          _initializedUid = user.uid;
+          _initFuture = _reinitialize();
         }
 
         _initFuture ??= _initAll();
-        return FutureBuilder<void>(
-          future: _initFuture,
-          builder: (context, initSnapshot) {
-            if (initSnapshot.connectionState != ConnectionState.done) {
-              return const MaterialApp(
-                debugShowCheckedModeBanner: false,
-                home: Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                ),
-              );
-            }
-            if (initSnapshot.hasError) {
-              return MaterialApp(
-                debugShowCheckedModeBanner: false,
-                home: Scaffold(
-                  body: Center(
-                    child: Text('Init error: ${initSnapshot.error}'),
-                  ),
-                ),
-              );
-            }
+        return _buildInitializedApp(_initFuture!);
+      },
+    );
+  }
 
-            return ProviderScope(
-              overrides: [
-                userRepositoryProvider.overrideWithValue(_userRepository!),
-                customerRepositoryProvider.overrideWithValue(
-                  _customerRepository!,
-                ),
-                supplierRepositoryProvider.overrideWithValue(
-                  _supplierRepository!,
-                ),
-                unitRepositoryProvider.overrideWithValue(_unitRepository!),
-                saleRepositoryProvider.overrideWithValue(_saleRepository!),
-                paymentRepositoryProvider.overrideWithValue(
-                  _paymentRepository!,
-                ),
-                purchaseRepositoryProvider.overrideWithValue(
-                  _purchaseRepository!,
-                ),
-                supplierPaymentRepositoryProvider.overrideWithValue(
-                  _supplierPaymentRepository!,
-                ),
-                syncServiceProvider.overrideWithValue(
-                  SyncService(
-                    userRepository: _userRepository!,
-                    customers: _customerRepository!,
-                    suppliers: _supplierRepository!,
-                    units: _unitRepository!,
-                    sales: _saleRepository!,
-                    payments: _paymentRepository!,
-                    purchases: _purchaseRepository!,
-                    supplierPayments: _supplierPaymentRepository!,
-                  ),
-                ),
-              ],
-              child: const InvestSystemApp(home: AppShell()),
-            );
-          },
+  Future<_BootstrapDependencies> _reinitialize() async {
+    await _disposeAll();
+    final dependencies = await _initAll();
+    _activeDependencies = dependencies;
+    return dependencies;
+  }
+
+  Widget _buildInitializedApp(Future<_BootstrapDependencies> future) {
+    return FutureBuilder<_BootstrapDependencies>(
+      future: future,
+      builder: (context, initSnapshot) {
+        if (initSnapshot.connectionState != ConnectionState.done) {
+          return _buildLoadingApp();
+        }
+        if (initSnapshot.hasError) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              body: Center(
+                child: Text('Init error: ${initSnapshot.error}'),
+              ),
+            ),
+          );
+        }
+        final dependencies = initSnapshot.data;
+        if (dependencies == null) {
+          return const MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              body: Center(
+                child: Text('Init error: Missing application dependencies.'),
+              ),
+            ),
+          );
+        }
+        _activeDependencies = dependencies;
+
+        return ProviderScope(
+          overrides: [
+            userRepositoryProvider.overrideWithValue(
+              dependencies.userRepository,
+            ),
+            customerRepositoryProvider.overrideWithValue(
+              dependencies.customerRepository,
+            ),
+            supplierRepositoryProvider.overrideWithValue(
+              dependencies.supplierRepository,
+            ),
+            unitRepositoryProvider.overrideWithValue(dependencies.unitRepository),
+            saleRepositoryProvider.overrideWithValue(dependencies.saleRepository),
+            paymentRepositoryProvider.overrideWithValue(
+              dependencies.paymentRepository,
+            ),
+            purchaseRepositoryProvider.overrideWithValue(
+              dependencies.purchaseRepository,
+            ),
+            supplierPaymentRepositoryProvider.overrideWithValue(
+              dependencies.supplierPaymentRepository,
+            ),
+            syncServiceProvider.overrideWithValue(
+              SyncService(
+                userRepository: dependencies.userRepository,
+                customers: dependencies.customerRepository,
+                suppliers: dependencies.supplierRepository,
+                units: dependencies.unitRepository,
+                sales: dependencies.saleRepository,
+                payments: dependencies.paymentRepository,
+                purchases: dependencies.purchaseRepository,
+                supplierPayments: dependencies.supplierPaymentRepository,
+              ),
+            ),
+          ],
+          child: const InvestSystemApp(home: AppShell()),
         );
       },
+    );
+  }
+
+  Widget _buildLoadingApp() {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
     );
   }
 }

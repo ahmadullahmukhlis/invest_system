@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import '../../../core/data/local_db.dart';
+import '../../../core/data/realtime_sync_client.dart';
 import '../../../core/utils/id.dart';
 import '../../../core/utils/network_utils.dart';
 import '../../../data/firebase_config.dart';
@@ -19,14 +20,19 @@ class SupplierRepository {
     Connectivity? connectivity,
     required UserRepository userRepository,
   })  : _localDb = localDb ?? LocalDb.instance,
-        _auth = auth ?? FirebaseAuth.instance,
-        _database = database ?? databaseInstance(),
+        _auth = userRepository.isCloudEnabled
+            ? (auth ?? FirebaseAuth.instance)
+            : null,
+        _database = userRepository.isCloudEnabled
+            ? (database ?? databaseInstanceOrNull())
+            : null,
         _connectivity = connectivity ?? Connectivity(),
         _userRepository = userRepository;
 
   final LocalDb _localDb;
-  final FirebaseAuth _auth;
-  final FirebaseDatabase _database;
+  final FirebaseAuth? _auth;
+  final FirebaseDatabase? _database;
+  final RealtimeSyncClient _restSync = RealtimeSyncClient.instance;
   final Connectivity _connectivity;
   final UserRepository _userRepository;
 
@@ -119,23 +125,34 @@ class SupplierRepository {
     return (existing['owner_uid'] as String? ?? '') == _currentUid;
   }
 
-  String get _currentUid => _auth.currentUser?.uid ?? '';
+  String get _currentUid => _userRepository.currentUid;
 
   bool get _isGlobal =>
       _userRepository.currentRole == 'admin' ||
       _userRepository.currentRole == 'super_admin';
 
   DatabaseReference _ref() {
+    final database = _database;
+    if (database == null) {
+      throw StateError('Cloud sync is disabled.');
+    }
     return _isGlobal
-        ? _database.ref('suppliers')
-        : _database.ref('suppliers/$_currentUid');
+        ? database.ref('suppliers')
+        : database.ref('suppliers/$_currentUid');
+  }
+
+  String get _collectionPath => _isGlobal ? 'suppliers' : 'suppliers/$_currentUid';
+
+  String _itemPath(String ownerUid, String id) {
+    return _isGlobal ? 'suppliers/$ownerUid/$id' : 'suppliers/$_currentUid/$id';
   }
 
   Future<void> _handleConnectivity(
     List<ConnectivityResult> result, {
     bool force = false,
   }) async {
-    final online = await hasInternetConnection(result);
+    final online = _userRepository.canSyncData &&
+        await hasInternetConnection(result);
     if (!force && online == _online) return;
     _online = online;
 
@@ -161,6 +178,11 @@ class SupplierRepository {
 
   Future<void> _startRemoteSync() async {
     await _remoteSub?.cancel();
+    if (_database == null) {
+      final value = await _restSync.getJson(_collectionPath);
+      await _applyRemoteSnapshot(value);
+      return;
+    }
     _remoteSub = _ref().onValue.listen((event) async {
       await _applyRemoteSnapshot(event.snapshot.value);
     });
@@ -277,8 +299,10 @@ class SupplierRepository {
     final isDeleted = (row['deleted'] as int? ?? 0) == 1;
     final payload = _toJson(row);
 
-    if (_isGlobal) {
-      await _database.ref('suppliers/$ownerUid/$id').set(payload);
+    if (_database == null) {
+      await _restSync.setJson(_itemPath(ownerUid, id), payload);
+    } else if (_isGlobal) {
+      await _database!.ref('suppliers/$ownerUid/$id').set(payload);
     } else {
       await _ref().child(id).set(payload);
     }

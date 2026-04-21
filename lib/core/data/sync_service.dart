@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../features/customers/data/customer_repository.dart';
 import '../../features/payments/data/payment_repository.dart';
 import '../../features/purchases/data/purchase_repository.dart';
@@ -33,15 +35,23 @@ class SyncService {
       userRepository.currentRole == 'super_admin';
 
   Future<void> syncAll() async {
-    await Future.wait(_ownerScopedSyncTasks(sync: true));
+    debugPrint('[SyncService] syncAll started for uid=${userRepository.currentUid} role=${userRepository.currentRole}');
+    await pullAll();
+    await pushAll();
+    await pullAll();
+    debugPrint('[SyncService] syncAll finished.');
   }
 
   Future<void> pullAll() async {
+    debugPrint('[SyncService] pullAll started.');
     await Future.wait(_ownerScopedSyncTasks(pull: true));
+    debugPrint('[SyncService] pullAll finished.');
   }
 
   Future<void> pushAll() async {
+    debugPrint('[SyncService] pushAll started.');
     await Future.wait(_ownerScopedSyncTasks(push: true));
+    debugPrint('[SyncService] pushAll finished.');
   }
 
   List<Future<void>> _ownerScopedSyncTasks({

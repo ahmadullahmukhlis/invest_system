@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -35,13 +34,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final userRepo = ref.watch(userRepositoryProvider);
     final isDesktop = Responsive.isDesktop(context);
+    final cloudEnabled = userRepo.isCloudEnabled;
+    final canSyncData = userRepo.canSyncData;
     final currentRole = userRepo.currentRole;
     final canManageUsers =
-        currentRole == 'admin' || currentRole == 'super_admin';
+        cloudEnabled &&
+        (currentRole == 'admin' || currentRole == 'super_admin');
     final canAssignSuper = currentRole == 'super_admin';
-    final canSync =
-        currentRole == 'super_admin' ||
-        (userRepo.current?.permissions['sync']?.view ?? false);
+    final canSync = canSyncData &&
+        (currentRole == 'super_admin' ||
+            (userRepo.current?.permissions['sync']?.view ?? false));
 
     return DesktopScaffold(
       title: 'Settings',
@@ -66,8 +68,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Sync local SQLite and Firebase Realtime Database.',
+                    Text(
+                      cloudEnabled
+                          ? 'Sync local SQLite and Firebase Realtime Database.'
+                          : canSyncData
+                          ? 'Windows local mode is active. SQLite stays local and sync uses Realtime Database REST calls.'
+                          : 'Windows local mode is active. Data is stored in local SQLite only.',
                     ),
                     const SizedBox(height: 16),
                     Wrap(
@@ -129,11 +135,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ],
                     ),
                     if (!canSync)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 12),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
                         child: Text(
-                          'Sync access is disabled for your account.',
-                          style: TextStyle(color: Colors.black54),
+                          cloudEnabled
+                              ? 'Sync access is disabled for your account.'
+                              : canSyncData
+                              ? 'Sync access is disabled for your account.'
+                              : 'Cloud sync is disabled in Windows local mode.',
+                          style: const TextStyle(color: Colors.black54),
                         ),
                       ),
                   ],
@@ -141,7 +151,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            if (isDesktop) ...[
+            if (isDesktop && cloudEnabled) ...[
               const SectionHeader(
                 title: 'Users & Roles',
                 subtitle: 'Assign roles and permissions',
@@ -215,11 +225,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: FilledButton.icon(
-                  onPressed: () async {
-                    await FirebaseAuth.instance.signOut();
-                  },
+                  onPressed: cloudEnabled
+                      ? () async {
+                          await ref.read(userRepositoryProvider).signOut();
+                        }
+                      : null,
                   icon: const Icon(Icons.logout),
-                  label: const Text('Sign Out'),
+                  label: Text(cloudEnabled ? 'Sign Out' : 'Local Session'),
                 ),
               ),
             ),

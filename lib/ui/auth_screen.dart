@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
+import '../core/data/realtime_sync_client.dart';
 import '../core/utils/network_utils.dart';
 import '../data/firebase_config.dart';
 import '../data/permissions.dart';
@@ -9,7 +10,12 @@ import '../data/user_repository.dart';
 import 'responsive.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  const AuthScreen({
+    super.key,
+    this.syncProfileToDatabase = true,
+  });
+
+  final bool syncProfileToDatabase;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -77,10 +83,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 20),
                     if (_isRegister)
-                      _Field(
-                        label: 'Full name',
-                        controller: _nameController,
-                      ),
+                      _Field(label: 'Full name', controller: _nameController),
                     _Field(
                       label: 'Email',
                       controller: _emailController,
@@ -171,27 +174,21 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       if (_isRegister) {
         final credential = await FirebaseAuth.instance
-            .createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
+            .createUserWithEmailAndPassword(email: email, password: password);
         await credential.user?.updateDisplayName(name);
-        await _ensureProfile(
-          user: credential.user,
-          name: name,
-          email: email,
-        );
+        if (widget.syncProfileToDatabase) {
+          await _ensureProfile(user: credential.user, name: name, email: email);
+        }
       } else {
         final credential = await FirebaseAuth.instance
-            .signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-        await _ensureProfile(
-          user: credential.user,
-          name: credential.user?.displayName ?? '',
-          email: email,
-        );
+            .signInWithEmailAndPassword(email: email, password: password);
+        if (widget.syncProfileToDatabase) {
+          await _ensureProfile(
+            user: credential.user,
+            name: credential.user?.displayName ?? '',
+            email: email,
+          );
+        }
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message ?? 'Authentication failed.');
@@ -210,35 +207,59 @@ class _AuthScreenState extends State<AuthScreen> {
     required String email,
   }) async {
     if (user == null) return;
-        final db = databaseInstance();
-        final usersRef = db.ref('users');
-        final userRef = usersRef.child(user.uid);
-        final snapshot = await userRef.get();
-        if (snapshot.exists) {
-          if (email.toLowerCase() == UserRepository.superAdminEmail) {
-            final permissions = defaultPermissionsForRole('super_admin');
-            await userRef.update({
-              'role': 'super_admin',
-              'permissions': permissions.map((k, v) => MapEntry(k, v.toJson())),
-              'updatedAt': DateTime.now().millisecondsSinceEpoch,
-            });
-          }
-          return;
-        }
-
-        final superAdminEmail = UserRepository.superAdminEmail;
-        final role = email.toLowerCase() == superAdminEmail
-            ? 'super_admin'
-            : 'viewer';
-        final permissions = defaultPermissionsForRole(role);
-        await userRef.set({
-          'name': name,
-          'email': email,
-          'role': role,
+    final db = databaseInstanceOrNull();
+    final restSync = RealtimeSyncClient.instance;
+    Map<dynamic, dynamic>? existing;
+    if (db != null) {
+      final snapshot = await db.ref('users').child(user.uid).get();
+      final value = snapshot.value;
+      existing = value is Map ? value.cast<dynamic, dynamic>() : null;
+    } else {
+      final value = await restSync.getJson('users/${user.uid}');
+      existing = value is Map ? value.cast<dynamic, dynamic>() : null;
+    }
+    if (existing != null) {
+      if (email.toLowerCase() == UserRepository.superAdminEmail) {
+        final permissions = defaultPermissionsForRole('super_admin');
+        final payload = {
+          'role': 'super_admin',
           'permissions': permissions.map((k, v) => MapEntry(k, v.toJson())),
           'updatedAt': DateTime.now().millisecondsSinceEpoch,
-        });
+        };
+        if (db != null) {
+          await db.ref('users').child(user.uid).update(payload);
+        } else {
+          final merged = <String, Object?>{};
+          for (final entry in existing.entries) {
+            if (entry.key is String) {
+              merged[entry.key as String] = entry.value;
+            }
+          }
+          merged.addAll(payload);
+          await restSync.setJson('users/${user.uid}', merged);
+        }
       }
+      return;
+    }
+
+    final superAdminEmail = UserRepository.superAdminEmail;
+    final role = email.toLowerCase() == superAdminEmail
+        ? 'super_admin'
+        : 'viewer';
+    final permissions = defaultPermissionsForRole(role);
+    final payload = {
+      'name': name,
+      'email': email,
+      'role': role,
+      'permissions': permissions.map((k, v) => MapEntry(k, v.toJson())),
+      'updatedAt': DateTime.now().millisecondsSinceEpoch,
+    };
+    if (db != null) {
+      await db.ref('users').child(user.uid).set(payload);
+    } else {
+      await restSync.setJson('users/${user.uid}', payload);
+    }
+  }
 }
 
 class _Field extends StatelessWidget {
