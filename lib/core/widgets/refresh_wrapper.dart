@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/sync_providers.dart';
-
-class RefreshWrapper extends ConsumerWidget {
+class RefreshWrapper extends StatelessWidget {
   const RefreshWrapper({super.key, required this.child});
 
   final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return RefreshIndicator(
-      onRefresh: () => ref.read(syncServiceProvider).syncAll(),
+      onRefresh: () async {},
       child: child,
     );
   }

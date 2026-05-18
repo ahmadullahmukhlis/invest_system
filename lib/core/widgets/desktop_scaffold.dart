@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../ui/responsive.dart';
-import '../data/sync_providers.dart';
-import '../utils/permission_utils.dart';
-import '../../data/user_providers.dart';
 import 'app_drawer.dart';
 import 'app_sidebar.dart';
 
@@ -30,24 +27,7 @@ class DesktopScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDesktop = Responsive.isDesktop(context);
     final contentPadding = padding ?? const EdgeInsets.all(20);
-    final userRepo = ref.watch(userRepositoryProvider);
-    final canUseSync = canView(userRepo, 'sync');
-    final desktopActions = [
-      if (showRefreshAction && canUseSync)
-        IconButton(
-          tooltip: 'Sync',
-          icon: const Icon(Icons.sync),
-          onPressed: () async {
-            await ref.read(syncServiceProvider).syncAll();
-            if (context.mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Sync completed.')));
-            }
-          },
-        ),
-      ...actions,
-    ];
+    final desktopActions = [...actions];
 
     if (!isDesktop) {
       return Scaffold(

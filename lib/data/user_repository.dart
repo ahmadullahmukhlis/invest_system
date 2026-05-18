@@ -1,23 +1,12 @@
 import 'dart:async';
 
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_core/firebase_core.dart';
-
-import '../core/utils/network_utils.dart';
 import 'permissions.dart';
 import 'user_profile.dart';
-import 'firebase_config.dart';
 
 class UserRepository {
-  UserRepository({
-    FirebaseAuth? auth,
-    FirebaseDatabase? database,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _database = database ?? databaseInstance();
+  UserRepository();
 
-  final FirebaseAuth _auth;
-  final FirebaseDatabase _database;
+  static const String localUserId = 'local-device';
 
   final _currentController = StreamController<UserProfile?>.broadcast();
   Stream<UserProfile?> get currentUserStream => _currentController.stream;
@@ -25,110 +14,63 @@ class UserRepository {
   final _allController = StreamController<List<UserProfile>>.broadcast();
   Stream<List<UserProfile>> get allUsersStream => _allController.stream;
 
-  StreamSubscription<DatabaseEvent>? _currentSub;
-  StreamSubscription<DatabaseEvent>? _allSub;
-
-  UserProfile? _current;
+  late UserProfile _current = _defaultProfile();
   UserProfile? get current => _current;
-  String get currentEmail => _auth.currentUser?.email ?? '';
-  String get currentRole {
-    if (_current != null) return _current!.role;
-    return currentEmail.toLowerCase() == superAdminEmail ? 'super_admin' : 'viewer';
-  }
+  String get currentEmail => _current.email;
+  String get currentRole => _current.role;
 
   Future<void> init() async {
-    await ensureCurrentUserProfile();
-    await _startCurrentListener();
+    _emit();
   }
 
   Future<void> dispose() async {
-    await _currentSub?.cancel();
-    await _allSub?.cancel();
     await _currentController.close();
     await _allController.close();
   }
 
-  DatabaseReference _usersRef() => _database.ref('users');
-
-  static const superAdminEmail = 'admin@admin.com';
-
-  Future<void> ensureCurrentUserProfile() async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-    final online = await hasInternet();
-    if (!online) return;
-    final ref = _usersRef().child(user.uid);
-    DataSnapshot snapshot;
-    try {
-      snapshot = await ref.get().timeout(const Duration(seconds: 5));
-    } catch (_) {
-      return;
-    }
-    if (snapshot.exists) {
-      final email = (user.email ?? '').toLowerCase();
-      if (email == superAdminEmail) {
-        await ref.update({
-          'role': 'super_admin',
-          'permissions': defaultPermissionsForRole('super_admin')
-              .map((k, v) => MapEntry(k, v.toJson())),
-          'updatedAt': DateTime.now().millisecondsSinceEpoch,
-        });
-      }
-      return;
-    }
-
-    final email = user.email ?? '';
-    final role = email.toLowerCase() == superAdminEmail
-        ? 'super_admin'
-        : 'viewer';
-    final profile = UserProfile(
-      uid: user.uid,
-      name: user.displayName ?? '',
-      email: email,
-      role: role,
-      permissions: defaultPermissionsForRole(role),
-      updatedAt: DateTime.now().millisecondsSinceEpoch,
-      isActive: true,
-    );
-    await ref.set(profile.toJson());
+  Future<void> startAllUsersListener() async {
+    _emit();
   }
 
   Future<void> updateCurrentProfile({
     required String name,
   }) async {
-    final user = _auth.currentUser;
-    if (user == null) return;
-    await user.updateDisplayName(name);
-    await _usersRef().child(user.uid).update({
-      'name': name,
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
-    });
+    _current = _current.copyWith(
+      name: name,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    _emit();
   }
 
   Future<void> updateUserRole(String uid, String role) async {
-    final permissions = defaultPermissionsForRole(role);
-    await _usersRef().child(uid).update({
-      'role': role,
-      'permissions': permissions.map((k, v) => MapEntry(k, v.toJson())),
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
-    });
+    if (uid != _current.uid) return;
+    _current = _current.copyWith(
+      role: role,
+      permissions: normalizePermissions(role, _current.permissions),
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    _emit();
   }
 
   Future<void> updateUserPermissions(
     String uid,
     Map<String, PermissionSet> permissions,
   ) async {
-    await _usersRef().child(uid).update({
-      'permissions': permissions.map((k, v) => MapEntry(k, v.toJson())),
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
-    });
+    if (uid != _current.uid) return;
+    _current = _current.copyWith(
+      permissions: permissions,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    _emit();
   }
 
   Future<void> updateUserActive(String uid, bool isActive) async {
-    await _usersRef().child(uid).update({
-      'isActive': isActive,
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
-    });
+    if (uid != _current.uid) return;
+    _current = _current.copyWith(
+      isActive: isActive,
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    _emit();
   }
 
   Future<void> createUser({
@@ -137,93 +79,26 @@ class UserRepository {
     required String name,
     required String role,
   }) async {
-    final primaryApp = Firebase.app();
-    final adminApp = await Firebase.initializeApp(
-      name: 'admin-${DateTime.now().millisecondsSinceEpoch}',
-      options: primaryApp.options,
+    throw UnsupportedError(
+      'Offline mode supports a single local Windows user profile only.',
     );
-    final adminAuth = FirebaseAuth.instanceFor(app: adminApp);
-    try {
-      final credential = await adminAuth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      await credential.user?.updateDisplayName(name);
-      final uid = credential.user?.uid;
-      if (uid == null) return;
-      final permissions = defaultPermissionsForRole(role);
-      final profile = UserProfile(
-        uid: uid,
-        name: name,
-        email: email,
-        role: role,
-        permissions: permissions,
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-        isActive: true,
-      );
-      await _usersRef().child(uid).set(profile.toJson());
-    } finally {
-      await adminAuth.signOut();
-      await adminApp.delete();
-    }
   }
 
-  Future<void> _startCurrentListener() async {
-    await _currentSub?.cancel();
-    final user = _auth.currentUser;
-    if (user == null) return;
-    _currentSub = _usersRef().child(user.uid).onValue.listen((event) {
-      final value = event.snapshot.value;
-      if (value is Map) {
-        final profile =
-            UserProfile.fromJson(user.uid, value.cast<dynamic, dynamic>());
-        if (!profile.isActive) {
-          _auth.signOut();
-          return;
-        }
-        final normalized =
-            normalizePermissions(profile.role, profile.permissions);
-        final needsUpdate = normalized.length != profile.permissions.length ||
-            normalized.entries.any((entry) {
-              final current = profile.permissions[entry.key];
-              if (current == null) return true;
-              return current.view != entry.value.view ||
-                  current.create != entry.value.create ||
-                  current.edit != entry.value.edit ||
-                  current.remove != entry.value.remove;
-            });
-        if (needsUpdate) {
-          _usersRef().child(user.uid).update({
-            'permissions': normalized.map((k, v) => MapEntry(k, v.toJson())),
-            'updatedAt': DateTime.now().millisecondsSinceEpoch,
-          });
-        }
-        _current = profile.copyWith(permissions: normalized);
-        _currentController.add(_current);
-      }
-    });
+  void _emit() {
+    _currentController.add(_current);
+    _allController.add([_current]);
   }
 
-  Future<void> startAllUsersListener() async {
-    await _allSub?.cancel();
-    _allSub = _usersRef().onValue.listen((event) {
-      final value = event.snapshot.value;
-      if (value is! Map) {
-        _allController.add(const []);
-        return;
-      }
-      final users = <UserProfile>[];
-      for (final entry in value.entries) {
-        final key = entry.key;
-        final data = entry.value;
-        if (key is! String || data is! Map) continue;
-        final profile =
-            UserProfile.fromJson(key, data.cast<dynamic, dynamic>());
-        final normalized =
-            normalizePermissions(profile.role, profile.permissions);
-        users.add(profile.copyWith(permissions: normalized));
-      }
-      _allController.add(users);
-    });
+  UserProfile _defaultProfile() {
+    const role = 'super_admin';
+    return UserProfile(
+      uid: localUserId,
+      name: 'Local Administrator',
+      email: 'offline@local',
+      role: role,
+      permissions: defaultPermissionsForRole(role),
+      updatedAt: DateTime.now().millisecondsSinceEpoch,
+      isActive: true,
+    );
   }
 }
