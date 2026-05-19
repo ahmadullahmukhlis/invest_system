@@ -1,41 +1,125 @@
+import 'dart:developer' as developer;
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 class LocalDb {
   LocalDb._();
 
   static final LocalDb instance = LocalDb._();
+  static const String _appDirectoryName = 'Invest System';
+  static const String _databaseDirectoryName = 'database';
+  static const String _databaseFileName = 'invest_system.db';
+  static const int _databaseVersion = 5;
+
   Database? _db;
+  Future<void>? _initFuture;
+  String? _databasePath;
   bool _useMemory = false;
   final Map<String, Map<String, Map<String, Object?>>> _memoryTables = {};
 
-  Future<void> init() async {
-    if (_db != null) return;
+  String? get databasePath => _databasePath;
+
+  Future<void> init() {
+    return _initFuture ??= _initInternal();
+  }
+
+  Future<void> _initInternal() async {
+    if (_db != null || _useMemory) return;
+
     if (kIsWeb) {
       _useMemory = true;
       _initMemoryTables();
+      _log('Initialized in-memory database for web.');
       return;
     }
-    String path;
-    final dbPath = await getDatabasesPath();
-    if (dbPath.isEmpty) {
-      path = 'invest_system.db';
-    } else {
-      path = p.join(dbPath, 'invest_system.db');
+
+    final path = await _resolveDatabasePath();
+    _databasePath = path;
+    _log('Opening SQLite database at $path');
+
+    try {
+      _db = await openDatabase(
+        path,
+        version: _databaseVersion,
+        singleInstance: true,
+        onConfigure: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON;');
+        },
+        onCreate: (db, version) async {
+          _log('Creating SQLite schema version $version');
+          await _migrate(db, fromVersion: 0, toVersion: version);
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          _log('Upgrading SQLite schema from $oldVersion to $newVersion');
+          await _migrate(
+            db,
+            fromVersion: oldVersion,
+            toVersion: newVersion,
+          );
+        },
+        onDowngrade: (db, oldVersion, newVersion) async {
+          _log(
+            'Database downgrade requested from $oldVersion to $newVersion. '
+            'Keeping schema and ensuring required tables/columns exist.',
+          );
+          await _ensureSchema(db);
+        },
+        onOpen: (db) async {
+          await _ensureSchema(db);
+          _log('SQLite database opened successfully.');
+        },
+      );
+    } catch (error, stackTrace) {
+      _log(
+        'Failed to open SQLite database at $path: $error',
+        stackTrace: stackTrace,
+      );
+      _initFuture = null;
+      throw StateError(
+        'Failed to open local database at "$path". '
+        'Ensure the application can write to the user documents folder. '
+        'Original error: $error',
+      );
     }
-    _db = await openDatabase(
-      path,
-      version: 5,
-      onCreate: (db, version) async {
-        await _createTables(db);
-        await _ensureColumns(db);
-      },
-      onUpgrade: (db, oldVersion, newVersion) async {
-        await _createTables(db);
-        await _ensureColumns(db);
-      },
+  }
+
+  Future<String> _resolveDatabasePath() async {
+    final documentsDirectory = await getApplicationDocumentsDirectory();
+    final databaseDirectory = Directory(
+      p.join(
+        documentsDirectory.path,
+        _appDirectoryName,
+        _databaseDirectoryName,
+      ),
     );
+
+    if (!await databaseDirectory.exists()) {
+      await databaseDirectory.create(recursive: true);
+      _log('Created SQLite directory: ${databaseDirectory.path}');
+    }
+
+    return p.join(databaseDirectory.path, _databaseFileName);
+  }
+
+  Future<void> _migrate(
+    Database db, {
+    required int fromVersion,
+    required int toVersion,
+  }) async {
+    _log('Applying SQLite migrations from $fromVersion to $toVersion');
+    await db.transaction((txn) async {
+      await _createTables(txn);
+      await _ensureColumns(txn);
+    });
+  }
+
+  Future<void> _ensureSchema(DatabaseExecutor db) async {
+    await _createTables(db);
+    await _ensureColumns(db);
   }
 
   void _initMemoryTables() {
@@ -52,7 +136,7 @@ class LocalDb {
     }
   }
 
-  Future<void> _createTables(Database db) async {
+  Future<void> _createTables(DatabaseExecutor db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS customers (
         id TEXT PRIMARY KEY,
@@ -157,7 +241,7 @@ class LocalDb {
     ''');
   }
 
-  Future<void> _ensureColumns(Database db) async {
+  Future<void> _ensureColumns(DatabaseExecutor db) async {
     await _addColumnIfMissing(db, 'customers', 'province', "TEXT NOT NULL DEFAULT ''");
     await _addColumnIfMissing(db, 'customers', 'district', "TEXT NOT NULL DEFAULT ''");
     await _addColumnIfMissing(db, 'customers', 'address', 'TEXT');
@@ -208,7 +292,7 @@ class LocalDb {
   }
 
   Future<void> _addColumnIfMissing(
-    Database db,
+    DatabaseExecutor db,
     String table,
     String column,
     String definition,
@@ -238,7 +322,7 @@ class LocalDb {
       });
       return filtered.map((row) => Map<String, Object?>.from(row)).toList();
     }
-    final rows = await _db!.query(
+    final rows = await _requireDb().query(
       table,
       where: all ? 'deleted = 0' : 'owner_uid = ? AND deleted = 0',
       whereArgs: all ? null : [ownerUid],
@@ -261,7 +345,7 @@ class LocalDb {
       }
       return Map<String, Object?>.from(row);
     }
-    final rows = await _db!.query(
+    final rows = await _requireDb().query(
       table,
       where: ownerUid == null ? 'id = ?' : 'id = ? AND owner_uid = ?',
       whereArgs: ownerUid == null ? [id] : [id, ownerUid],
@@ -277,7 +361,7 @@ class LocalDb {
       _memoryTables[table]?[id] = Map<String, Object?>.from(data);
       return;
     }
-    await _db!.insert(
+    await _requireDb().insert(
       table,
       data,
       conflictAlgorithm: ConflictAlgorithm.replace,
@@ -298,7 +382,7 @@ class LocalDb {
       }).toList();
       return filtered.map((row) => Map<String, Object?>.from(row)).toList();
     }
-    final rows = await _db!.query(
+    final rows = await _requireDb().query(
       table,
       where: all ? 'dirty = 1' : 'dirty = 1 AND owner_uid = ?',
       whereArgs: all ? null : [ownerUid],
@@ -314,7 +398,7 @@ class LocalDb {
       }
       return;
     }
-    await _db!.update(
+    await _requireDb().update(
       table,
       {'dirty': 0},
       where: 'id = ?',
@@ -327,7 +411,7 @@ class LocalDb {
       _memoryTables[table]?.remove(id);
       return;
     }
-    await _db!.delete(
+    await _requireDb().delete(
       table,
       where: 'id = ?',
       whereArgs: [id],
@@ -345,10 +429,24 @@ class LocalDb {
       }
       return;
     }
-    await _db!.update(
+    await _requireDb().update(
       table,
       {'owner_uid': ownerUid},
       where: "owner_uid = ''",
     );
+  }
+
+  Database _requireDb() {
+    final db = _db;
+    if (db == null) {
+      throw StateError(
+        'Local database has not been initialized. Call LocalDb.instance.init() first.',
+      );
+    }
+    return db;
+  }
+
+  void _log(String message, {StackTrace? stackTrace}) {
+    developer.log(message, name: 'LocalDb', stackTrace: stackTrace);
   }
 }

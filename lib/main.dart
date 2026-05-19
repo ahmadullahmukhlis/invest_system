@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:developer' as developer;
+import 'dart:ui';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -10,6 +12,7 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/data/local_db.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/firebase_setup_screen.dart';
 import 'core/data/sync_providers.dart';
@@ -35,14 +38,20 @@ import 'ui/auth_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (kIsWeb) {
-    databaseFactory = databaseFactoryFfiWeb;
-  } else if (defaultTargetPlatform == TargetPlatform.windows ||
-      defaultTargetPlatform == TargetPlatform.macOS ||
-      defaultTargetPlatform == TargetPlatform.linux) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+  _configureGlobalErrorHandling();
+  _configureSqliteFactory();
+
+  final dbInitResult = await _initLocalDatabase();
+  if (!dbInitResult.ok) {
+    runApp(
+      _StartupErrorApp(
+        title: 'Database initialization failed',
+        message: dbInitResult.message!,
+      ),
+    );
+    return;
   }
+
   final initResult = await _initFirebase();
   if (!initResult.ok) {
     runApp(
@@ -53,50 +62,152 @@ Future<void> main() async {
   runApp(const AppBootstrap());
 }
 
-class _FirebaseInitResult {
-  const _FirebaseInitResult({required this.ok, this.message});
+class _StartupInitResult {
+  const _StartupInitResult({required this.ok, this.message});
 
   final bool ok;
   final String? message;
 }
 
-Future<_FirebaseInitResult> _initFirebase() async {
+void _configureGlobalErrorHandling() {
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    developer.log(
+      details.exceptionAsString(),
+      name: 'FlutterError',
+      error: details.exception,
+      stackTrace: details.stack,
+    );
+  };
+
+  PlatformDispatcher.instance.onError = (error, stackTrace) {
+    developer.log(
+      'Uncaught platform error: $error',
+      name: 'PlatformDispatcher',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    return true;
+  };
+}
+
+void _configureSqliteFactory() {
+  if (kIsWeb) {
+    databaseFactory = databaseFactoryFfiWeb;
+    return;
+  }
+
+  if (defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.linux) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+}
+
+Future<_StartupInitResult> _initLocalDatabase() async {
+  try {
+    await LocalDb.instance.init();
+    return const _StartupInitResult(ok: true);
+  } catch (error, stackTrace) {
+    developer.log(
+      'Local database initialization failed: $error',
+      name: 'Startup',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    return _StartupInitResult(
+      ok: false,
+      message:
+          'The application could not open its local SQLite database.\n\n'
+          'Path: ${LocalDb.instance.databasePath ?? 'unresolved'}\n\n'
+          'Error: $error\n\n'
+          'The app stores its database in your writable Documents folder so it '
+          'works in release builds, installed builds, and Program Files '
+          'installs.',
+    );
+  }
+}
+
+Future<_StartupInitResult> _initFirebase() async {
   try {
     if (kIsWeb) {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
-      return const _FirebaseInitResult(ok: true);
+      return const _StartupInitResult(ok: true);
     }
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
       case TargetPlatform.iOS:
         await Firebase.initializeApp();
-        return const _FirebaseInitResult(ok: true);
+        return const _StartupInitResult(ok: true);
       case TargetPlatform.macOS:
         await Firebase.initializeApp(options: DefaultFirebaseOptions.macos);
-        return const _FirebaseInitResult(ok: true);
+        return const _StartupInitResult(ok: true);
       case TargetPlatform.windows:
         await Firebase.initializeApp(options: DefaultFirebaseOptions.windows);
-        return const _FirebaseInitResult(ok: true);
+        return const _StartupInitResult(ok: true);
       case TargetPlatform.linux:
-        return const _FirebaseInitResult(
+        return const _StartupInitResult(
           ok: false,
           message:
               'Firebase is not supported on Linux. Run on Windows or macOS, or '
               'remove Firebase usage for Linux builds.',
         );
       case TargetPlatform.fuchsia:
-        return const _FirebaseInitResult(
+        return const _StartupInitResult(
           ok: false,
           message: 'Firebase is not supported on Fuchsia.',
         );
     }
   } catch (error) {
-    return _FirebaseInitResult(
+    return _StartupInitResult(
       ok: false,
       message:
           'Firebase initialization failed: $error\n\n'
           'Ensure FlutterFire is configured for this desktop platform.',
+    );
+  }
+}
+
+class _StartupErrorApp extends StatelessWidget {
+  const _StartupErrorApp({
+    required this.title,
+    required this.message,
+  });
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SelectableText(message),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
