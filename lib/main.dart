@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:ui';
 
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
@@ -14,12 +12,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/data/local_db.dart';
 import 'core/widgets/app_shell.dart';
-import 'core/widgets/firebase_setup_screen.dart';
 import 'core/data/sync_providers.dart';
 import 'core/data/sync_service.dart';
+import 'data/user_profile.dart';
 import 'data/user_repository.dart';
 import 'data/user_providers.dart';
-import 'firebase_options.dart';
 import 'features/customers/data/customer_providers.dart';
 import 'features/customers/data/customer_repository.dart';
 import 'features/payments/data/payment_providers.dart';
@@ -48,14 +45,6 @@ Future<void> main() async {
         title: 'Database initialization failed',
         message: dbInitResult.message!,
       ),
-    );
-    return;
-  }
-
-  final initResult = await _initFirebase();
-  if (!initResult.ok) {
-    runApp(
-      InvestSystemApp(home: FirebaseSetupScreen(message: initResult.message)),
     );
     return;
   }
@@ -129,47 +118,6 @@ Future<_StartupInitResult> _initLocalDatabase() async {
   }
 }
 
-Future<_StartupInitResult> _initFirebase() async {
-  try {
-    if (kIsWeb) {
-      await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
-      return const _StartupInitResult(ok: true);
-    }
-
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-      case TargetPlatform.iOS:
-        await Firebase.initializeApp();
-        return const _StartupInitResult(ok: true);
-      case TargetPlatform.macOS:
-        await Firebase.initializeApp(options: DefaultFirebaseOptions.macos);
-        return const _StartupInitResult(ok: true);
-      case TargetPlatform.windows:
-        await Firebase.initializeApp(options: DefaultFirebaseOptions.windows);
-        return const _StartupInitResult(ok: true);
-      case TargetPlatform.linux:
-        return const _StartupInitResult(
-          ok: false,
-          message:
-              'Firebase is not supported on Linux. Run on Windows or macOS, or '
-              'remove Firebase usage for Linux builds.',
-        );
-      case TargetPlatform.fuchsia:
-        return const _StartupInitResult(
-          ok: false,
-          message: 'Firebase is not supported on Fuchsia.',
-        );
-    }
-  } catch (error) {
-    return _StartupInitResult(
-      ok: false,
-      message:
-          'Firebase initialization failed: $error\n\n'
-          'Ensure FlutterFire is configured for this desktop platform.',
-    );
-  }
-}
-
 class _StartupErrorApp extends StatelessWidget {
   const _StartupErrorApp({
     required this.title,
@@ -232,6 +180,7 @@ class _AppBootstrapState extends State<AppBootstrap> {
 
   Future<void> _initAll() async {
     final userRepository = UserRepository();
+    await userRepository.init();
     final customerRepository = CustomerRepository(
       userRepository: userRepository,
     );
@@ -257,7 +206,6 @@ class _AppBootstrapState extends State<AppBootstrap> {
     _purchaseRepository = purchaseRepository;
     _supplierPaymentRepository = supplierPaymentRepository;
 
-    await _userRepository!.init();
     await _customerRepository!.init();
     await _supplierRepository!.init();
     await _unitRepository!.init();
@@ -294,75 +242,72 @@ class _AppBootstrapState extends State<AppBootstrap> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+    final initFuture = _initFuture ??= _initAll();
+    return FutureBuilder<void>(
+      future: initFuture,
       builder: (context, snapshot) {
-        final user = snapshot.data;
-        if (user == null) {
-          _initFuture = null;
-          unawaited(_disposeAll());
-          return const InvestSystemApp(home: AuthScreen());
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+        if (snapshot.hasError) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              body: Center(
+                child: Text('Init error: ${snapshot.error}'),
+              ),
+            ),
+          );
         }
 
-        _initFuture ??= _initAll();
-        return FutureBuilder<void>(
-          future: _initFuture,
-          builder: (context, initSnapshot) {
-            if (initSnapshot.connectionState != ConnectionState.done) {
-              return const MaterialApp(
-                debugShowCheckedModeBanner: false,
-                home: Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                ),
+        return ProviderScope(
+          overrides: [
+            userRepositoryProvider.overrideWithValue(_userRepository!),
+            customerRepositoryProvider.overrideWithValue(
+              _customerRepository!,
+            ),
+            supplierRepositoryProvider.overrideWithValue(
+              _supplierRepository!,
+            ),
+            unitRepositoryProvider.overrideWithValue(_unitRepository!),
+            saleRepositoryProvider.overrideWithValue(_saleRepository!),
+            paymentRepositoryProvider.overrideWithValue(
+              _paymentRepository!,
+            ),
+            purchaseRepositoryProvider.overrideWithValue(
+              _purchaseRepository!,
+            ),
+            supplierPaymentRepositoryProvider.overrideWithValue(
+              _supplierPaymentRepository!,
+            ),
+            syncServiceProvider.overrideWithValue(
+              SyncService(
+                userRepository: _userRepository!,
+                customers: _customerRepository!,
+                suppliers: _supplierRepository!,
+                units: _unitRepository!,
+                sales: _saleRepository!,
+                payments: _paymentRepository!,
+                purchases: _purchaseRepository!,
+                supplierPayments: _supplierPaymentRepository!,
+              ),
+            ),
+          ],
+          child: StreamBuilder<UserProfile?>(
+            stream: _userRepository!.currentUserStream,
+            initialData: _userRepository!.current,
+            builder: (context, userSnapshot) {
+              final user = userSnapshot.data;
+              return InvestSystemApp(
+                home: user == null ? const AuthScreen() : const AppShell(),
               );
-            }
-            if (initSnapshot.hasError) {
-              return MaterialApp(
-                debugShowCheckedModeBanner: false,
-                home: Scaffold(
-                  body: Center(
-                    child: Text('Init error: ${initSnapshot.error}'),
-                  ),
-                ),
-              );
-            }
-
-            return ProviderScope(
-              overrides: [
-                userRepositoryProvider.overrideWithValue(_userRepository!),
-                customerRepositoryProvider.overrideWithValue(
-                  _customerRepository!,
-                ),
-                supplierRepositoryProvider.overrideWithValue(
-                  _supplierRepository!,
-                ),
-                unitRepositoryProvider.overrideWithValue(_unitRepository!),
-                saleRepositoryProvider.overrideWithValue(_saleRepository!),
-                paymentRepositoryProvider.overrideWithValue(
-                  _paymentRepository!,
-                ),
-                purchaseRepositoryProvider.overrideWithValue(
-                  _purchaseRepository!,
-                ),
-                supplierPaymentRepositoryProvider.overrideWithValue(
-                  _supplierPaymentRepository!,
-                ),
-                syncServiceProvider.overrideWithValue(
-                  SyncService(
-                    userRepository: _userRepository!,
-                    customers: _customerRepository!,
-                    suppliers: _supplierRepository!,
-                    units: _unitRepository!,
-                    sales: _saleRepository!,
-                    payments: _paymentRepository!,
-                    purchases: _purchaseRepository!,
-                    supplierPayments: _supplierPaymentRepository!,
-                  ),
-                ),
-              ],
-              child: const InvestSystemApp(home: AppShell()),
-            );
-          },
+            },
+          ),
         );
       },
     );

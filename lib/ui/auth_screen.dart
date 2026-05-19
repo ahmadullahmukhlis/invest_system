@@ -1,27 +1,41 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/utils/network_utils.dart';
-import '../data/firebase_config.dart';
-import '../data/permissions.dart';
-import '../data/user_repository.dart';
+import '../data/user_providers.dart';
 import 'responsive.dart';
 
-class AuthScreen extends StatefulWidget {
+class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
 
   @override
-  State<AuthScreen> createState() => _AuthScreenState();
+  ConsumerState<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> {
+class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+
   bool _isRegister = false;
   bool _loading = false;
+  bool _hasUsers = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_loadRegistrationState);
+  }
+
+  Future<void> _loadRegistrationState() async {
+    final repo = ref.read(userRepositoryProvider);
+    final hasUsers = await repo.hasUsers();
+    if (!mounted) return;
+    setState(() {
+      _hasUsers = hasUsers;
+      _isRegister = !hasUsers;
+    });
+  }
 
   @override
   void dispose() {
@@ -34,6 +48,8 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final canToggleMode = Responsive.isTablet(context);
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -65,12 +81,16 @@ class _AuthScreenState extends State<AuthScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _isRegister ? 'Create Account' : 'Welcome Back',
+                      _isRegister ? 'Create Local Account' : 'Welcome Back',
                       style: theme.textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Sign in to access your office purchase system.',
+                      _isRegister
+                          ? _hasUsers
+                              ? 'Create a local Windows account for this device.'
+                              : 'Create the first local administrator account for this device.'
+                          : 'Sign in with your local Windows account.',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: Colors.black54,
                       ),
@@ -117,20 +137,23 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 8),
                     TextButton(
-                      onPressed: _loading || !Responsive.isTablet(context)
+                      onPressed: _loading || !canToggleMode
                           ? null
-                          : () => setState(() => _isRegister = !_isRegister),
+                          : () => setState(() {
+                              _error = null;
+                              _isRegister = !_isRegister;
+                            }),
                       child: Text(
                         _isRegister
                             ? 'Already have an account? Sign in'
                             : 'Create new account',
                       ),
                     ),
-                    if (!Responsive.isTablet(context))
+                    if (!_hasUsers)
                       const Padding(
                         padding: EdgeInsets.only(top: 8),
                         child: Text(
-                          'Account creation is available on desktop only.',
+                          'The first account created on this Windows machine becomes the local administrator.',
                           style: TextStyle(color: Colors.black54),
                         ),
                       ),
@@ -146,8 +169,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submit() async {
     final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+    final password = _passwordController.text;
     final name = _nameController.text.trim();
+
     if (email.isEmpty || password.isEmpty) {
       setState(() => _error = 'Email and password are required.');
       return;
@@ -157,88 +181,32 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
-    final online = await hasInternet();
-    if (!online) {
-      setState(() => _error = 'No internet connection.');
-      return;
-    }
-
     setState(() {
       _loading = true;
       _error = null;
     });
 
     try {
+      final repo = ref.read(userRepositoryProvider);
       if (_isRegister) {
-        final credential = await FirebaseAuth.instance
-            .createUserWithEmailAndPassword(
+        await repo.registerUser(
           email: email,
           password: password,
-        );
-        await credential.user?.updateDisplayName(name);
-        await _ensureProfile(
-          user: credential.user,
           name: name,
-          email: email,
         );
       } else {
-        final credential = await FirebaseAuth.instance
-            .signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-        await _ensureProfile(
-          user: credential.user,
-          name: credential.user?.displayName ?? '',
-          email: email,
-        );
+        await repo.signIn(email: email, password: password);
       }
-    } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.message ?? 'Authentication failed.');
-    } catch (_) {
-      setState(() => _error = 'Authentication failed.');
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = '$error'.replaceFirst('Bad state: ', ''));
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
       }
     }
   }
-
-  Future<void> _ensureProfile({
-    required User? user,
-    required String name,
-    required String email,
-  }) async {
-    if (user == null) return;
-        final db = databaseInstance();
-        final usersRef = db.ref('users');
-        final userRef = usersRef.child(user.uid);
-        final snapshot = await userRef.get();
-        if (snapshot.exists) {
-          if (email.toLowerCase() == UserRepository.superAdminEmail) {
-            final permissions = defaultPermissionsForRole('super_admin');
-            await userRef.update({
-              'role': 'super_admin',
-              'permissions': permissions.map((k, v) => MapEntry(k, v.toJson())),
-              'updatedAt': DateTime.now().millisecondsSinceEpoch,
-            });
-          }
-          return;
-        }
-
-        final superAdminEmail = UserRepository.superAdminEmail;
-        final role = email.toLowerCase() == superAdminEmail
-            ? 'super_admin'
-            : 'viewer';
-        final permissions = defaultPermissionsForRole(role);
-        await userRef.set({
-          'name': name,
-          'email': email,
-          'role': role,
-          'permissions': permissions.map((k, v) => MapEntry(k, v.toJson())),
-          'updatedAt': DateTime.now().millisecondsSinceEpoch,
-        });
-      }
 }
 
 class _Field extends StatelessWidget {

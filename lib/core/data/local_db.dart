@@ -22,6 +22,7 @@ class LocalDb {
   final Map<String, Map<String, Map<String, Object?>>> _memoryTables = {};
 
   String? get databasePath => _databasePath;
+  Database get database => _requireDb();
 
   Future<void> init() {
     return _initFuture ??= _initInternal();
@@ -131,6 +132,8 @@ class LocalDb {
       'suppliers',
       'purchases',
       'supplier_payments',
+      'app_users',
+      'app_session',
     ]) {
       _memoryTables.putIfAbsent(name, () => <String, Map<String, Object?>>{});
     }
@@ -239,6 +242,24 @@ class LocalDb {
         dirty INTEGER NOT NULL
       )
     ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS app_users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL,
+        permissions_json TEXT NOT NULL,
+        updated_at INTEGER NOT NULL,
+        is_active INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS app_session (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        current_uid TEXT
+      )
+    ''');
   }
 
   Future<void> _ensureColumns(DatabaseExecutor db) async {
@@ -289,6 +310,15 @@ class LocalDb {
     await _addColumnIfMissing(db, 'supplier_payments', 'amount', 'REAL NOT NULL DEFAULT 0');
     await _addColumnIfMissing(db, 'supplier_payments', 'note', 'TEXT');
     await _addColumnIfMissing(db, 'supplier_payments', 'deleted', 'INTEGER NOT NULL DEFAULT 0');
+
+    await _addColumnIfMissing(db, 'app_users', 'name', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(db, 'app_users', 'email', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(db, 'app_users', 'password_hash', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(db, 'app_users', 'role', "TEXT NOT NULL DEFAULT 'viewer'");
+    await _addColumnIfMissing(db, 'app_users', 'permissions_json', "TEXT NOT NULL DEFAULT '{}'");
+    await _addColumnIfMissing(db, 'app_users', 'updated_at', 'INTEGER NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(db, 'app_users', 'is_active', 'INTEGER NOT NULL DEFAULT 1');
+    await _addColumnIfMissing(db, 'app_session', 'current_uid', 'TEXT');
   }
 
   Future<void> _addColumnIfMissing(

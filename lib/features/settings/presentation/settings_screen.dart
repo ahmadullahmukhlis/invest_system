@@ -1,12 +1,11 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/data/sync_providers.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
+import '../../../core/widgets/desktop_table.dart';
 import '../../../core/widgets/refresh_wrapper.dart';
 import '../../../core/widgets/section_header.dart';
-import '../../../core/widgets/desktop_table.dart';
 import '../../../data/permissions.dart';
 import '../../../data/user_providers.dart';
 import '../../../data/user_profile.dart';
@@ -39,9 +38,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final canManageUsers =
         currentRole == 'admin' || currentRole == 'super_admin';
     final canAssignSuper = currentRole == 'super_admin';
-    final canSync =
-        currentRole == 'super_admin' ||
-        (userRepo.current?.permissions['sync']?.view ?? false);
 
     return DesktopScaffold(
       title: 'Settings',
@@ -51,9 +47,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           padding: EdgeInsets.zero,
           children: [
             const SectionHeader(
-              title: 'Data Sync',
-              subtitle: 'Keep local and cloud data in sync',
-              icon: Icons.sync,
+              title: 'Local Data',
+              subtitle: 'SQLite only on Windows',
+              icon: Icons.storage_outlined,
             ),
             Card(
               child: Padding(
@@ -62,12 +58,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Data Sync',
+                      'Local Data',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Sync local SQLite and Firebase Realtime Database.',
+                      'This Windows build stores data locally in SQLite. Firebase and cloud sync are disabled.',
                     ),
                     const SizedBox(height: 16),
                     Wrap(
@@ -75,67 +71,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       runSpacing: 12,
                       children: [
                         FilledButton.icon(
-                          onPressed: !canSync
-                              ? null
-                              : () async {
-                                  await ref.read(syncServiceProvider).syncAll();
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Sync completed.'),
-                                      ),
-                                    );
-                                  }
-                                },
+                          onPressed: () async {
+                            await ref.read(syncServiceProvider).syncAll();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Local data refreshed.'),
+                                ),
+                              );
+                            }
+                          },
                           icon: const Icon(Icons.sync),
-                          label: const Text('Sync Now'),
+                          label: const Text('Refresh'),
                         ),
                         OutlinedButton.icon(
-                          onPressed: !canSync
-                              ? null
-                              : () async {
-                                  await ref.read(syncServiceProvider).pushAll();
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Pushed local data to server.',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                          icon: const Icon(Icons.cloud_upload_outlined),
-                          label: const Text('SQLite → Realtime'),
+                          onPressed: () async {
+                            await ref.read(syncServiceProvider).pushAll();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('SQLite validation completed.'),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.verified_outlined),
+                          label: const Text('Validate SQLite'),
                         ),
                         OutlinedButton.icon(
-                          onPressed: !canSync
-                              ? null
-                              : () async {
-                                  await ref.read(syncServiceProvider).pullAll();
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Pulled server data to SQLite.',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                          icon: const Icon(Icons.cloud_download_outlined),
-                          label: const Text('Realtime → SQLite'),
+                          onPressed: () async {
+                            await ref.read(syncServiceProvider).pullAll();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Local views reloaded.'),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.refresh_outlined),
+                          label: const Text('Reload Views'),
                         ),
                       ],
                     ),
-                    if (!canSync)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 12),
-                        child: Text(
-                          'Sync access is disabled for your account.',
-                          style: TextStyle(color: Colors.black54),
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -144,7 +122,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             if (isDesktop) ...[
               const SectionHeader(
                 title: 'Users & Roles',
-                subtitle: 'Assign roles and permissions',
+                subtitle: 'Manage local Windows users',
                 icon: Icons.manage_accounts_outlined,
               ),
               Card(
@@ -185,7 +163,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               DataColumn(label: Text('Email')),
                               DataColumn(label: Text('Role')),
                               DataColumn(label: Text('Active')),
-                              DataColumn(label: Text('Sync')),
+                              DataColumn(label: Text('Local Admin')),
                               DataColumn(label: Text('Permissions')),
                             ],
                             rows: [
@@ -216,7 +194,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 padding: const EdgeInsets.all(16),
                 child: FilledButton.icon(
                   onPressed: () async {
-                    await FirebaseAuth.instance.signOut();
+                    await ref.read(userRepositoryProvider).signOut();
                   },
                   icon: const Icon(Icons.logout),
                   label: const Text('Sign Out'),
@@ -240,7 +218,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         userRepo.currentRole == 'super_admin' ||
         userRepo.currentRole == 'admin';
     final canEditSuper = canAssignSuper || user.role != 'super_admin';
-    final canToggleSync = canEditRole && canEditSuper;
 
     return DataRow(
       cells: [
@@ -277,25 +254,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
         DataCell(
-          Switch(
-            value: user.permissions['sync']?.view ?? false,
-            onChanged: !canToggleSync
-                ? null
-                : (value) async {
-                    final updated = Map<String, PermissionSet>.from(
-                      user.permissions,
-                    );
-                    final current =
-                        updated['sync'] ??
-                        PermissionSet(
-                          view: false,
-                          create: false,
-                          edit: false,
-                          remove: false,
-                        );
-                    updated['sync'] = current.copyWith(view: value);
-                    await userRepo.updateUserPermissions(user.uid, updated);
-                  },
+          Icon(
+            user.role == 'super_admin'
+                ? Icons.verified_user_outlined
+                : Icons.person_outline,
           ),
         ),
         DataCell(
@@ -318,34 +280,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final permissions = Map<String, PermissionSet>.from(
       normalizePermissions(user.role, user.permissions),
     );
-    final formKey = GlobalKey<FormState>();
 
     await showDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: Text(
-            'Permissions • ${user.name.isEmpty ? user.email : user.name}',
+            'Permissions - ${user.name.isEmpty ? user.email : user.name}',
           ),
           content: SizedBox(
             width: 520,
-            child: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    for (final module in modules) ...[
-                      _PermissionRow(
-                        module: module,
-                        permission: permissions[module]!,
-                        onChanged: (value) {
-                          permissions[module] = value;
-                        },
-                      ),
-                      const Divider(height: 1),
-                    ],
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  for (final module in modules) ...[
+                    _PermissionRow(
+                      module: module,
+                      permission: permissions[module]!,
+                      onChanged: (value) {
+                        permissions[module] = value;
+                      },
+                    ),
+                    const Divider(height: 1),
                   ],
-                ),
+                ],
               ),
             ),
           ),
