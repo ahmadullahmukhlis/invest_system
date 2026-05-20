@@ -36,7 +36,7 @@ Future<String?> savePdfToDownloads({
 }
 
 Future<String> saveFileToInvestmentDocuments({
-  required Uint8List bytes,
+  required List<int> bytes,
   required String fileName,
 }) async {
   final Directory dir;
@@ -50,9 +50,8 @@ Future<String> saveFileToInvestmentDocuments({
     }
     dir = Directory('/storage/emulated/0/Documents/Investment');
   } else {
-    final documentsDirectory = await getApplicationDocumentsDirectory();
-    final baseDirectory = documentsDirectory.parent;
-    dir = Directory(p.join(baseDirectory.path, 'Investment'));
+    final documentsDirectory = await _resolveUserDocumentsDirectory();
+    dir = Directory(p.join(documentsDirectory.path, 'Investment'));
   }
 
   if (!await dir.exists()) {
@@ -62,4 +61,22 @@ Future<String> saveFileToInvestmentDocuments({
   final file = File(p.join(dir.path, fileName));
   await file.writeAsBytes(bytes, flush: true);
   return file.path;
+}
+
+Future<Directory> _resolveUserDocumentsDirectory() async {
+  if (Platform.isWindows) {
+    final userProfile = Platform.environment['USERPROFILE'];
+    if (userProfile != null && userProfile.isNotEmpty) {
+      return Directory(p.join(userProfile, 'Documents'));
+    }
+  }
+
+  if (Platform.isMacOS || Platform.isLinux) {
+    final home = Platform.environment['HOME'];
+    if (home != null && home.isNotEmpty) {
+      return Directory(p.join(home, 'Documents'));
+    }
+  }
+
+  return getApplicationDocumentsDirectory();
 }
