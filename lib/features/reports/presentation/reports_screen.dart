@@ -1,12 +1,9 @@
-import 'dart:io';
-
 import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:invest_system/features/units/domain/unit.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
+import '../../../core/utils/pdf_utils.dart';
 import '../../../core/widgets/desktop_scaffold.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/data/geo_providers.dart';
@@ -61,9 +58,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     final defaultSheet = excel.getDefaultSheet();
     final sheet = excel[defaultSheet!];
-    excel.rename(defaultSheet, "Customers");
+    excel.rename(defaultSheet, 'Customers');
 
-    // Add headers
     sheet.appendRow([
       TextCellValue('Customer'),
       TextCellValue('Phone'),
@@ -77,7 +73,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       TextCellValue('Balance'),
     ]);
 
-    // Add data rows
     for (final row in rows) {
       sheet.appendRow([
         TextCellValue(row.name),
@@ -95,15 +90,29 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     final bytes = excel.encode();
     if (bytes == null) {
-      print("❌ Excel encoding failed");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Excel export failed.')),
+      );
       return;
     }
 
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/customer_report.xlsx');
+    try {
+      final savedPath = await saveFileToInvestmentDocuments(
+        bytes: bytes,
+        fileName: 'customer_report.xlsx',
+      );
 
-    await file.writeAsBytes(bytes, flush: true);
-    await Share.shareXFiles([XFile(file.path)], text: 'Customer Report');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Saved to: $savedPath')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save Excel file.')),
+      );
+    }
   }
 
   @override
