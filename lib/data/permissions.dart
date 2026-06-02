@@ -133,7 +133,7 @@ Map<String, PermissionSet> defaultPermissionsForRole(String role) {
           remove: false,
         ),
         'settings': PermissionSet(
-          view: false,
+          view: true,
           create: false,
           edit: false,
           remove: false,
@@ -227,7 +227,7 @@ Map<String, PermissionSet> defaultPermissionsForRole(String role) {
           remove: false,
         ),
         'settings': PermissionSet(
-          view: false,
+          view: true,
           create: false,
           edit: false,
           remove: false,

@@ -41,6 +41,7 @@ final visibleNavItemsProvider = Provider<List<NavItem>>((ref) {
 
   bool canView(String? module) {
     if (module == null) return true;
+    if (module == 'settings') return true;
     if (role == 'admin' || role == 'super_admin') return true;
     return permissions[module]?.view ?? false;
   }

@@ -37,6 +37,7 @@ class MoreScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     bool canView(String module) {
+      if (module == 'settings') return true;
       if (role == 'super_admin') return true;
       return permissions[module]?.view ?? false;
     }
@@ -100,10 +101,7 @@ class MoreScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('More'),
-        centerTitle: false,
-      ),
+      appBar: AppBar(title: const Text('More'), centerTitle: false),
       body: Responsive.centered(
         context,
         ListView.separated(
@@ -145,9 +143,7 @@ class MoreScreen extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             module.subtitle,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.black54),
                           ),
                         ],
@@ -164,13 +160,8 @@ class MoreScreen extends StatelessWidget {
     );
   }
 
-  void _openModule(
-    BuildContext context,
-    WidgetBuilder builder,
-  ) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: builder),
-    );
+  void _openModule(BuildContext context, WidgetBuilder builder) {
+    Navigator.of(context).push(MaterialPageRoute(builder: builder));
   }
 }
 
