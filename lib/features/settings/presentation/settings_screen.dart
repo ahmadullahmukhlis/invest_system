@@ -38,10 +38,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final canSyncData = userRepo.canSyncData;
     final currentRole = userRepo.currentRole;
     final canManageUsers =
-        cloudEnabled &&
-        (currentRole == 'admin' || currentRole == 'super_admin');
+        currentRole == 'admin' || currentRole == 'super_admin';
     final canAssignSuper = currentRole == 'super_admin';
-    final canSync = canSyncData &&
+    final canSync =
+        canSyncData &&
         (currentRole == 'super_admin' ||
             (userRepo.current?.permissions['sync']?.view ?? false));
 
@@ -54,8 +54,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           children: [
             const SectionHeader(
               title: 'Data Sync',
-              subtitle: 'Keep local and cloud data in sync',
-              icon: Icons.sync,
+              subtitle: 'Local SQLite storage status',
+              icon: Icons.storage_outlined,
             ),
             Card(
               child: Padding(
@@ -70,10 +70,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 8),
                     Text(
                       cloudEnabled
-                          ? 'Sync local SQLite and Firebase Realtime Database.'
+                          ? 'Cloud sync is disabled for this local SQLite build.'
                           : canSyncData
-                          ? 'Windows local mode is active. SQLite stays local and sync uses Realtime Database REST calls.'
-                          : 'Windows local mode is active. Data is stored in local SQLite only.',
+                          ? 'Local SQLite mode is active.'
+                          : 'Data is stored in local SQLite only.',
                     ),
                     const SizedBox(height: 16),
                     Wrap(
@@ -112,7 +112,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   }
                                 },
                           icon: const Icon(Icons.cloud_upload_outlined),
-                          label: const Text('SQLite → Realtime'),
+                          label: const Text('Push Disabled'),
                         ),
                         OutlinedButton.icon(
                           onPressed: !canSync
@@ -130,7 +130,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   }
                                 },
                           icon: const Icon(Icons.cloud_download_outlined),
-                          label: const Text('Realtime → SQLite'),
+                          label: const Text('Pull Disabled'),
                         ),
                       ],
                     ),
@@ -142,7 +142,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               ? 'Sync access is disabled for your account.'
                               : canSyncData
                               ? 'Sync access is disabled for your account.'
-                              : 'Cloud sync is disabled in Windows local mode.',
+                              : 'Cloud sync is disabled in local SQLite mode.',
                           style: const TextStyle(color: Colors.black54),
                         ),
                       ),
@@ -151,7 +151,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            if (isDesktop && cloudEnabled) ...[
+            if (isDesktop && canManageUsers) ...[
               const SectionHeader(
                 title: 'Users & Roles',
                 subtitle: 'Assign roles and permissions',
@@ -225,13 +225,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: FilledButton.icon(
-                  onPressed: cloudEnabled
-                      ? () async {
-                          await ref.read(userRepositoryProvider).signOut();
-                        }
-                      : null,
+                  onPressed: () async {
+                    await ref.read(userRepositoryProvider).signOut();
+                  },
                   icon: const Icon(Icons.logout),
-                  label: Text(cloudEnabled ? 'Sign Out' : 'Local Session'),
+                  label: const Text('Sign Out'),
                 ),
               ),
             ),

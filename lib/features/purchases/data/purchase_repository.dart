@@ -1,38 +1,24 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
 
 import '../../../core/data/local_db.dart';
-import '../../../core/data/realtime_sync_client.dart';
 import '../../../core/utils/id.dart';
 import '../../../core/utils/network_utils.dart';
-import '../../../data/firebase_config.dart';
 import '../../../data/user_repository.dart';
 import '../domain/purchase.dart';
 
 class PurchaseRepository {
   PurchaseRepository({
     LocalDb? localDb,
-    FirebaseAuth? auth,
-    FirebaseDatabase? database,
     Connectivity? connectivity,
     required UserRepository userRepository,
-  })  : _localDb = localDb ?? LocalDb.instance,
-        _auth = userRepository.isCloudEnabled
-            ? (auth ?? FirebaseAuth.instance)
-            : null,
-        _database = userRepository.isCloudEnabled
-            ? (database ?? databaseInstanceOrNull())
-            : null,
-        _connectivity = connectivity ?? Connectivity(),
-        _userRepository = userRepository;
+  }) : _localDb = localDb ?? LocalDb.instance,
+       _connectivity = connectivity ?? Connectivity(),
+       _userRepository = userRepository;
 
   final LocalDb _localDb;
-  final FirebaseAuth? _auth;
-  final FirebaseDatabase? _database;
-  final RealtimeSyncClient _restSync = RealtimeSyncClient.instance;
+  final dynamic _database = null;
   final Connectivity _connectivity;
   final UserRepository _userRepository;
 
@@ -43,7 +29,7 @@ class PurchaseRepository {
   bool _online = false;
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
-  StreamSubscription<DatabaseEvent>? _remoteSub;
+  StreamSubscription? _remoteSub;
   StreamSubscription? _profileSub;
 
   Future<void> init() async {
@@ -101,8 +87,7 @@ class PurchaseRepository {
   }
 
   Future<void> deleteById(String id) async {
-    final existing =
-        await _localDb.getById('purchases', id);
+    final existing = await _localDb.getById('purchases', id);
     if (existing == null) return;
     if ((existing['owner_uid'] as String? ?? '') != _currentUid) {
       return;
@@ -131,7 +116,7 @@ class PurchaseRepository {
       _userRepository.currentRole == 'admin' ||
       _userRepository.currentRole == 'super_admin';
 
-  DatabaseReference _ref() {
+  dynamic _ref() {
     final database = _database;
     if (database == null) {
       throw StateError('Cloud sync is disabled.');
@@ -141,18 +126,12 @@ class PurchaseRepository {
         : database.ref('purchases/$_currentUid');
   }
 
-  String get _collectionPath => _isGlobal ? 'purchases' : 'purchases/$_currentUid';
-
-  String _itemPath(String ownerUid, String id) {
-    return _isGlobal ? 'purchases/$ownerUid/$id' : 'purchases/$_currentUid/$id';
-  }
-
   Future<void> _handleConnectivity(
     List<ConnectivityResult> result, {
     bool force = false,
   }) async {
-    final online = _userRepository.canSyncData &&
-        await hasInternetConnection(result);
+    final online =
+        _userRepository.canSyncData && await hasInternetConnection(result);
     if (!force && online == _online) return;
     _online = online;
 
@@ -179,8 +158,6 @@ class PurchaseRepository {
   Future<void> _startRemoteSync() async {
     await _remoteSub?.cancel();
     if (_database == null) {
-      final value = await _restSync.getJson(_collectionPath);
-      await _applyRemoteSnapshot(value);
       return;
     }
     _remoteSub = _ref().onValue.listen((event) async {
@@ -208,7 +185,11 @@ class PurchaseRepository {
           final key = entry.key;
           final data = entry.value;
           if (key is! String || data is! Map) continue;
-          final remote = _fromJson(key, ownerUid, data.cast<dynamic, dynamic>());
+          final remote = _fromJson(
+            key,
+            ownerUid,
+            data.cast<dynamic, dynamic>(),
+          );
           final local = await _localDb.getById(
             'purchases',
             remote.id,
@@ -300,7 +281,7 @@ class PurchaseRepository {
     final payload = _toJson(row);
 
     if (_database == null) {
-      await _restSync.setJson(_itemPath(ownerUid, id), payload);
+      return;
     } else if (_isGlobal) {
       await _database!.ref('purchases/$ownerUid/$id').set(payload);
     } else {
@@ -363,9 +344,7 @@ class PurchaseRepository {
       data: Purchase(
         id: id,
         supplierId: (json['supplier_id'] as String?) ?? '',
-        date: DateTime.fromMillisecondsSinceEpoch(
-          (json['date'] as int?) ?? 0,
-        ),
+        date: DateTime.fromMillisecondsSinceEpoch((json['date'] as int?) ?? 0),
         quantityValue: (json['quantity_value'] as num?)?.toDouble() ?? 0,
         unitId: (json['unit_id'] as String?) ?? '',
         pricePerUnit: (json['price_per_unit'] as num?)?.toDouble() ?? 0,

@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../data/user_repository.dart';
@@ -12,106 +11,99 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
     return StreamBuilder(
       stream: userRepository.currentUserStream,
       builder: (context, snapshot) {
         final profile = snapshot.data;
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Settings'),
-            centerTitle: false,
-          ),
+          appBar: AppBar(title: const Text('Settings'), centerTitle: false),
           body: Responsive.centered(
             context,
             ListView(
               padding: Responsive.pagePadding(context),
               children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: const Color(0xFFE7EAF6),
-                      child: Text(
-                        (user?.email?.isNotEmpty ?? false)
-                            ? user!.email![0].toUpperCase()
-                            : 'U',
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            profile?.name.isNotEmpty == true
-                                ? profile!.name
-                                : (user?.email ?? 'Unknown User'),
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          Text(
-                            '${profile?.role ?? 'staff'} account',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: Colors.black54),
-                          ),
-                        ],
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: const Color(0xFFE7EAF6),
+                        child: Text(
+                          (profile?.email.isNotEmpty ?? false)
+                              ? profile!.email[0].toUpperCase()
+                              : 'L',
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (profile?.role == 'admin' || profile?.role == 'super_admin')
-                _SettingsTile(
-                  title: 'User Management',
-                  subtitle: 'Invite, edit roles, permissions',
-                  icon: Icons.group,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => UsersScreen(userRepository: userRepository),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              profile?.name.isNotEmpty == true
+                                  ? profile!.name
+                                  : (profile?.email ?? 'Local User'),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            Text(
+                              '${profile?.role ?? 'staff'} account',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              if (profile?.role == 'admin' || profile?.role == 'super_admin')
+                const SizedBox(height: 16),
+                if (profile?.role == 'admin' || profile?.role == 'super_admin')
+                  _SettingsTile(
+                    title: 'User Management',
+                    subtitle: 'Invite, edit roles, permissions',
+                    icon: Icons.group,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            UsersScreen(userRepository: userRepository),
+                      ),
+                    ),
+                  ),
+                if (profile?.role == 'admin' || profile?.role == 'super_admin')
+                  const SizedBox(height: 12),
+                _SettingsTile(
+                  title: 'Team Roles',
+                  subtitle: 'Admin, manager, staff',
+                  icon: Icons.security,
+                ),
                 const SizedBox(height: 12),
-              _SettingsTile(
-                title: 'Team Roles',
-                subtitle: 'Admin, manager, staff',
-                icon: Icons.security,
-              ),
-              const SizedBox(height: 12),
-              _SettingsTile(
-                title: 'Notifications',
-                subtitle: 'Purchase alerts and approvals',
-                icon: Icons.notifications,
-              ),
-              const SizedBox(height: 12),
-              _SettingsTile(
-                title: 'Data Sync',
-                subtitle: 'Offline-first enabled',
-                icon: Icons.sync,
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () async {
-                  await FirebaseAuth.instance.signOut();
-                },
-                child: const Text('Sign Out'),
-              ),
+                _SettingsTile(
+                  title: 'Notifications',
+                  subtitle: 'Purchase alerts and approvals',
+                  icon: Icons.notifications,
+                ),
+                const SizedBox(height: 12),
+                _SettingsTile(
+                  title: 'Data Sync',
+                  subtitle: 'Offline-first enabled',
+                  icon: Icons.sync,
+                ),
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: null,
+                  child: const Text('Local Session'),
+                ),
               ],
             ),
           ),
@@ -162,17 +154,13 @@ class _SettingsTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: Colors.black54),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.black54),
                   ),
                 ],
               ),

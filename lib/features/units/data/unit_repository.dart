@@ -1,38 +1,24 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
 
 import '../../../core/data/local_db.dart';
-import '../../../core/data/realtime_sync_client.dart';
 import '../../../core/utils/id.dart';
 import '../../../core/utils/network_utils.dart';
-import '../../../data/firebase_config.dart';
 import '../../../data/user_repository.dart';
 import '../domain/unit.dart';
 
 class UnitRepository {
   UnitRepository({
     LocalDb? localDb,
-    FirebaseAuth? auth,
-    FirebaseDatabase? database,
     Connectivity? connectivity,
     required UserRepository userRepository,
-  })  : _localDb = localDb ?? LocalDb.instance,
-        _auth = userRepository.isCloudEnabled
-            ? (auth ?? FirebaseAuth.instance)
-            : null,
-        _database = userRepository.isCloudEnabled
-            ? (database ?? databaseInstanceOrNull())
-            : null,
-        _connectivity = connectivity ?? Connectivity(),
-        _userRepository = userRepository;
+  }) : _localDb = localDb ?? LocalDb.instance,
+       _connectivity = connectivity ?? Connectivity(),
+       _userRepository = userRepository;
 
   final LocalDb _localDb;
-  final FirebaseAuth? _auth;
-  final FirebaseDatabase? _database;
-  final RealtimeSyncClient _restSync = RealtimeSyncClient.instance;
+  final dynamic _database = null;
   final Connectivity _connectivity;
   final UserRepository _userRepository;
 
@@ -43,7 +29,7 @@ class UnitRepository {
   bool _online = false;
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
-  StreamSubscription<DatabaseEvent>? _remoteSub;
+  StreamSubscription? _remoteSub;
   StreamSubscription? _profileSub;
 
   Future<void> init() async {
@@ -128,9 +114,7 @@ class UnitRepository {
     }
   }
 
-  String get _currentUid => _userRepository.currentUid;
-
-  DatabaseReference _ref() {
+  dynamic _ref() {
     final database = _database;
     if (database == null) {
       throw StateError('Cloud sync is disabled.');
@@ -142,8 +126,8 @@ class UnitRepository {
     List<ConnectivityResult> result, {
     bool force = false,
   }) async {
-    final online = _userRepository.canSyncData &&
-        await hasInternetConnection(result);
+    final online =
+        _userRepository.canSyncData && await hasInternetConnection(result);
     if (!force && online == _online) return;
     _online = online;
 
@@ -158,10 +142,7 @@ class UnitRepository {
   }
 
   Future<void> _loadLocal() async {
-    final rows = await _localDb.getAll(
-      'units',
-      all: true,
-    );
+    final rows = await _localDb.getAll('units', all: true);
     _items = rows.map(_fromRow).toList();
     _controller.add(_items);
   }
@@ -169,8 +150,6 @@ class UnitRepository {
   Future<void> _startRemoteSync() async {
     await _remoteSub?.cancel();
     if (_database == null) {
-      final value = await _restSync.getJson('units');
-      await _applyRemoteSnapshot(value);
       return;
     }
     _remoteSub = _ref().onValue.listen((event) async {
@@ -193,15 +172,8 @@ class UnitRepository {
       final key = entry.key;
       final data = entry.value;
       if (key is! String || data is! Map) continue;
-      final remote = _fromJson(
-        key,
-        '',
-        data.cast<dynamic, dynamic>(),
-      );
-      final local = await _localDb.getById(
-        'units',
-        remote.id,
-      );
+      final remote = _fromJson(key, '', data.cast<dynamic, dynamic>());
+      final local = await _localDb.getById('units', remote.id);
       final localUpdated = (local?['updated_at'] as int?) ?? 0;
       if (remote.deleted == 1) {
         if (local != null) {
@@ -231,10 +203,7 @@ class UnitRepository {
   }
 
   Future<void> _pushDirty() async {
-    final rows = await _localDb.getDirty(
-      'units',
-      all: true,
-    );
+    final rows = await _localDb.getDirty('units', all: true);
     for (final row in rows) {
       await _pushRow(row);
     }
@@ -247,7 +216,7 @@ class UnitRepository {
     final payload = _toJson(row);
 
     if (_database == null) {
-      await _restSync.setJson('units/$id', payload);
+      return;
     } else {
       await _ref().child(id).set(payload);
     }

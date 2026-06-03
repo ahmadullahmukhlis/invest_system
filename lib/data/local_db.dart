@@ -1,7 +1,7 @@
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../core/data/database_path_stub.dart'
+    if (dart.library.io) '../core/data/database_path_io.dart';
 import 'customer.dart';
 import 'product.dart';
 import 'vendor.dart';
@@ -15,8 +15,7 @@ class LocalDb {
 
   Future<void> init() async {
     if (_db != null) return;
-    final dir = await getApplicationDocumentsDirectory();
-    final path = p.join(dir.path, 'invest_system.db');
+    final path = await localDatabasePath('invest_system.db');
     _db = await openDatabase(
       path,
       version: 4,
@@ -139,10 +138,30 @@ class LocalDb {
             dirty INTEGER NOT NULL
           )
         ''');
-        await _addColumnIfMissing(db, 'customers', 'owner_uid', "TEXT NOT NULL DEFAULT ''");
-        await _addColumnIfMissing(db, 'products', 'owner_uid', "TEXT NOT NULL DEFAULT ''");
-        await _addColumnIfMissing(db, 'vendors', 'owner_uid', "TEXT NOT NULL DEFAULT ''");
-        await _addColumnIfMissing(db, 'purchases', 'owner_uid', "TEXT NOT NULL DEFAULT ''");
+        await _addColumnIfMissing(
+          db,
+          'customers',
+          'owner_uid',
+          "TEXT NOT NULL DEFAULT ''",
+        );
+        await _addColumnIfMissing(
+          db,
+          'products',
+          'owner_uid',
+          "TEXT NOT NULL DEFAULT ''",
+        );
+        await _addColumnIfMissing(
+          db,
+          'vendors',
+          'owner_uid',
+          "TEXT NOT NULL DEFAULT ''",
+        );
+        await _addColumnIfMissing(
+          db,
+          'purchases',
+          'owner_uid',
+          "TEXT NOT NULL DEFAULT ''",
+        );
       },
     );
   }
@@ -212,11 +231,9 @@ class LocalDb {
   }
 
   Future<void> claimUnownedCustomers(String ownerUid) async {
-    await _db!.update(
-      'customers',
-      {'owner_uid': ownerUid},
-      where: "owner_uid = ''",
-    );
+    await _db!.update('customers', {
+      'owner_uid': ownerUid,
+    }, where: "owner_uid = ''");
   }
 
   Future<List<Product>> getAllProducts({
@@ -272,11 +289,9 @@ class LocalDb {
   }
 
   Future<void> claimUnownedProducts(String ownerUid) async {
-    await _db!.update(
-      'products',
-      {'owner_uid': ownerUid},
-      where: "owner_uid = ''",
-    );
+    await _db!.update('products', {
+      'owner_uid': ownerUid,
+    }, where: "owner_uid = ''");
   }
 
   Future<List<Vendor>> getAllVendors({
@@ -332,11 +347,9 @@ class LocalDb {
   }
 
   Future<void> claimUnownedVendors(String ownerUid) async {
-    await _db!.update(
-      'vendors',
-      {'owner_uid': ownerUid},
-      where: "owner_uid = ''",
-    );
+    await _db!.update('vendors', {
+      'owner_uid': ownerUid,
+    }, where: "owner_uid = ''");
   }
 
   Future<List<Purchase>> getAllPurchases({
@@ -392,10 +405,8 @@ class LocalDb {
   }
 
   Future<void> claimUnownedPurchases(String ownerUid) async {
-    await _db!.update(
-      'purchases',
-      {'owner_uid': ownerUid},
-      where: "owner_uid = ''",
-    );
+    await _db!.update('purchases', {
+      'owner_uid': ownerUid,
+    }, where: "owner_uid = ''");
   }
 }

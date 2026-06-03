@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
+
+import 'database_path_stub.dart' if (dart.library.io) 'database_path_io.dart';
 
 class LocalDb {
   LocalDb._();
@@ -17,13 +18,7 @@ class LocalDb {
       _initMemoryTables();
       return;
     }
-    String path;
-    final dbPath = await getDatabasesPath();
-    if (dbPath.isEmpty) {
-      path = 'invest_system.db';
-    } else {
-      path = p.join(dbPath, 'invest_system.db');
-    }
+    final path = await localDatabasePath('invest_system.db');
     _db = await openDatabase(
       path,
       version: 5,
@@ -158,53 +153,218 @@ class LocalDb {
   }
 
   Future<void> _ensureColumns(Database db) async {
-    await _addColumnIfMissing(db, 'customers', 'province', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, 'customers', 'district', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(
+      db,
+      'customers',
+      'province',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      db,
+      'customers',
+      'district',
+      "TEXT NOT NULL DEFAULT ''",
+    );
     await _addColumnIfMissing(db, 'customers', 'address', 'TEXT');
-    await _addColumnIfMissing(db, 'customers', 'email', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, 'customers', 'company', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, 'customers', 'notes', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, 'customers', 'deleted', 'INTEGER NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+      db,
+      'customers',
+      'email',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      db,
+      'customers',
+      'company',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      db,
+      'customers',
+      'notes',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      db,
+      'customers',
+      'deleted',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
 
-    await _addColumnIfMissing(db, 'units', 'is_active', 'INTEGER NOT NULL DEFAULT 1');
-    await _addColumnIfMissing(db, 'units', 'deleted', 'INTEGER NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+      db,
+      'units',
+      'is_active',
+      'INTEGER NOT NULL DEFAULT 1',
+    );
+    await _addColumnIfMissing(
+      db,
+      'units',
+      'deleted',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
 
-    await _addColumnIfMissing(db, 'sales', 'customer_id', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, 'sales', 'date', 'INTEGER NOT NULL DEFAULT 0');
-    await _addColumnIfMissing(db, 'sales', 'quantity_value', 'REAL NOT NULL DEFAULT 0');
-    await _addColumnIfMissing(db, 'sales', 'unit_id', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, 'sales', 'price_per_unit', 'REAL NOT NULL DEFAULT 0');
-    await _addColumnIfMissing(db, 'sales', 'total_price', 'REAL NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+      db,
+      'sales',
+      'customer_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      db,
+      'sales',
+      'date',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      db,
+      'sales',
+      'quantity_value',
+      'REAL NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      db,
+      'sales',
+      'unit_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      db,
+      'sales',
+      'price_per_unit',
+      'REAL NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      db,
+      'sales',
+      'total_price',
+      'REAL NOT NULL DEFAULT 0',
+    );
     await _addColumnIfMissing(db, 'sales', 'note', 'TEXT');
-    await _addColumnIfMissing(db, 'sales', 'deleted', 'INTEGER NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+      db,
+      'sales',
+      'deleted',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
 
-    await _addColumnIfMissing(db, 'payments', 'customer_id', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(
+      db,
+      'payments',
+      'customer_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
     await _addColumnIfMissing(db, 'payments', 'sale_id', 'TEXT');
-    await _addColumnIfMissing(db, 'payments', 'date', 'INTEGER NOT NULL DEFAULT 0');
-    await _addColumnIfMissing(db, 'payments', 'amount', 'REAL NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+      db,
+      'payments',
+      'date',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      db,
+      'payments',
+      'amount',
+      'REAL NOT NULL DEFAULT 0',
+    );
     await _addColumnIfMissing(db, 'payments', 'note', 'TEXT');
-    await _addColumnIfMissing(db, 'payments', 'deleted', 'INTEGER NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+      db,
+      'payments',
+      'deleted',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
 
-    await _addColumnIfMissing(db, 'suppliers', 'province', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, 'suppliers', 'district', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(
+      db,
+      'suppliers',
+      'province',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      db,
+      'suppliers',
+      'district',
+      "TEXT NOT NULL DEFAULT ''",
+    );
     await _addColumnIfMissing(db, 'suppliers', 'address', 'TEXT');
-    await _addColumnIfMissing(db, 'suppliers', 'deleted', 'INTEGER NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+      db,
+      'suppliers',
+      'deleted',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
 
-    await _addColumnIfMissing(db, 'purchases', 'supplier_id', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, 'purchases', 'date', 'INTEGER NOT NULL DEFAULT 0');
-    await _addColumnIfMissing(db, 'purchases', 'quantity_value', 'REAL NOT NULL DEFAULT 0');
-    await _addColumnIfMissing(db, 'purchases', 'unit_id', "TEXT NOT NULL DEFAULT ''");
-    await _addColumnIfMissing(db, 'purchases', 'price_per_unit', 'REAL NOT NULL DEFAULT 0');
-    await _addColumnIfMissing(db, 'purchases', 'total_price', 'REAL NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+      db,
+      'purchases',
+      'supplier_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      db,
+      'purchases',
+      'date',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      db,
+      'purchases',
+      'quantity_value',
+      'REAL NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      db,
+      'purchases',
+      'unit_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      db,
+      'purchases',
+      'price_per_unit',
+      'REAL NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      db,
+      'purchases',
+      'total_price',
+      'REAL NOT NULL DEFAULT 0',
+    );
     await _addColumnIfMissing(db, 'purchases', 'note', 'TEXT');
-    await _addColumnIfMissing(db, 'purchases', 'deleted', 'INTEGER NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+      db,
+      'purchases',
+      'deleted',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
 
-    await _addColumnIfMissing(db, 'supplier_payments', 'supplier_id', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(
+      db,
+      'supplier_payments',
+      'supplier_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
     await _addColumnIfMissing(db, 'supplier_payments', 'purchase_id', 'TEXT');
-    await _addColumnIfMissing(db, 'supplier_payments', 'date', 'INTEGER NOT NULL DEFAULT 0');
-    await _addColumnIfMissing(db, 'supplier_payments', 'amount', 'REAL NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+      db,
+      'supplier_payments',
+      'date',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      db,
+      'supplier_payments',
+      'amount',
+      'REAL NOT NULL DEFAULT 0',
+    );
     await _addColumnIfMissing(db, 'supplier_payments', 'note', 'TEXT');
-    await _addColumnIfMissing(db, 'supplier_payments', 'deleted', 'INTEGER NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+      db,
+      'supplier_payments',
+      'deleted',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
   }
 
   Future<void> _addColumnIfMissing(
@@ -255,8 +415,7 @@ class LocalDb {
     if (_useMemory) {
       final row = _memoryTables[table]?[id];
       if (row == null) return null;
-      if (ownerUid != null &&
-          (row['owner_uid'] as String? ?? '') != ownerUid) {
+      if (ownerUid != null && (row['owner_uid'] as String? ?? '') != ownerUid) {
         return null;
       }
       return Map<String, Object?>.from(row);
@@ -314,12 +473,7 @@ class LocalDb {
       }
       return;
     }
-    await _db!.update(
-      table,
-      {'dirty': 0},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await _db!.update(table, {'dirty': 0}, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> delete(String table, String id) async {
@@ -327,11 +481,7 @@ class LocalDb {
       _memoryTables[table]?.remove(id);
       return;
     }
-    await _db!.delete(
-      table,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await _db!.delete(table, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> claimUnowned(String table, String ownerUid) async {
@@ -345,10 +495,6 @@ class LocalDb {
       }
       return;
     }
-    await _db!.update(
-      table,
-      {'owner_uid': ownerUid},
-      where: "owner_uid = ''",
-    );
+    await _db!.update(table, {'owner_uid': ownerUid}, where: "owner_uid = ''");
   }
 }
